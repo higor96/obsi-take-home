@@ -67,7 +67,7 @@ class MainTest {
     }
 
     @Test
-    @DisplayName("D-005 CLI: an empty books array fails as no book surviving screening, calculationTime echoed")
+    @DisplayName("§6 CLI (D-005): an empty books array fails as no book surviving screening, calculationTime echoed")
     void emptyBooksFails() throws IOException {
         Path input = write("{\"calculationTime\": \"2026-10-27T12:00:00Z\", \"books\": []}");
 
@@ -97,7 +97,7 @@ class MainTest {
     }
 
     @Test
-    @DisplayName("D-008 CLI: a missing input file fails with calculationTime null and exit 1")
+    @DisplayName("CLI contract (D-008): a missing input file fails with calculationTime null and exit 1")
     void missingFileFails() {
         Path missing = tempDir.resolve("missing.json");
 
@@ -105,7 +105,7 @@ class MainTest {
     }
 
     @Test
-    @DisplayName("D-008 CLI: no input path, two paths, or an unknown option is a usage error: failure JSON on stderr, exit 2")
+    @DisplayName("CLI contract (D-008): no input path, two paths, or an unknown option is a usage error: failure JSON on stderr, exit 2")
     void usageErrors() {
         String usage = "usage: ./run.sh [--new-ped] <input.json>";
 
@@ -116,7 +116,7 @@ class MainTest {
     }
 
     @Test
-    @DisplayName("D-008 CLI: --new-ped is recognised but fails until the Task 2 calculation exists")
+    @DisplayName("CLI contract (D-008): --new-ped is recognised but fails until the Task 2 calculation exists")
     void newPedIsNotImplementedYet() {
         assertFailure(run("--new-ped", "data/sample-input.json"), Main.USAGE_ERROR, null,
                 "--new-ped is not implemented yet");

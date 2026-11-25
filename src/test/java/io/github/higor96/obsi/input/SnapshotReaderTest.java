@@ -37,7 +37,7 @@ class SnapshotReaderTest {
         }
 
         @Test
-        @DisplayName("D-004 a calculationTime with fractional seconds is accepted and kept exactly as written")
+        @DisplayName("Input contract (D-004): a calculationTime with fractional seconds is accepted and kept exactly as written")
         void keepsCalculationTimeAsWritten() {
             Snapshot snapshot = SnapshotReader.read("{\"calculationTime\": \"2026-10-27T12:00:00.120Z\", \"books\": []}");
 
@@ -135,13 +135,13 @@ class SnapshotReaderTest {
         }
 
         @Test
-        @DisplayName("D-005 an empty books array is read as no books, not as an input error")
+        @DisplayName("§6 (D-005): an empty books array is read as no books, not as an input error")
         void readsEmptyBooks() {
             assertEquals(List.of(), SnapshotReader.read("{" + TIME + ", \"books\": []}").books());
         }
 
         @Test
-        @DisplayName("D-018 fields outside the input contract are ignored, at the top level and in books")
+        @DisplayName("Input contract (D-018): fields outside the input contract are ignored, at the top level and in books")
         void ignoresUnknownFields() {
             Snapshot snapshot = SnapshotReader.read("{" + TIME + ", \"source\": \"feed-1\", \"books\": ["
                     + "{\"exchange\": \"Alpha\", \"venue\": \"spot\", \"bids\": [[99, 1]], \"asks\": [[101, 1]]}]}");
@@ -165,14 +165,14 @@ class SnapshotReaderTest {
                 "{\"exchange\": \" \\t \", \"bids\": [], \"asks\": []}",
                 "{\"exchange\": 7, \"bids\": [], \"asks\": []}",
                 "{\"exchange\": null, \"bids\": [], \"asks\": []}"})
-        @DisplayName("D-003 a book that is not an object, or has no usable exchange name, is read as Unnamed")
+        @DisplayName("§2 (D-003): a book that is not an object, or has no usable exchange name, is read as Unnamed")
         void readsUnnamedBook(String book) {
             assertEquals(List.of(new RawBook.Unnamed()), readBooks(book));
         }
 
         @ParameterizedTest(name = "bids: {0}")
         @ValueSource(strings = {"null", "{}", "\"[[100, 1]]\"", "42"})
-        @DisplayName("D-003 a side that is not an array is read as Unreadable")
+        @DisplayName("§2 (D-003): a side that is not an array is read as Unreadable")
         void readsUnreadableSide(String bids) {
             RawBook.Named book = (RawBook.Named) readBooks(
                     "{\"exchange\": \"Alpha\", \"bids\": " + bids + ", \"asks\": [[101, 1]]}").getFirst();
@@ -182,7 +182,7 @@ class SnapshotReaderTest {
         }
 
         @Test
-        @DisplayName("D-003 a missing side is read as Unreadable")
+        @DisplayName("§2 (D-003): a missing side is read as Unreadable")
         void readsMissingSideAsUnreadable() {
             RawBook.Named book = (RawBook.Named) readBooks("{\"exchange\": \"Alpha\", \"asks\": [[101, 1]]}").getFirst();
 
@@ -191,7 +191,7 @@ class SnapshotReaderTest {
         }
 
         @Test
-        @DisplayName("D-003 an exchange name is kept exactly as written")
+        @DisplayName("§2 (D-003): an exchange name is kept exactly as written")
         void keepsExchangeNameAsWritten() {
             RawBook.Named book = (RawBook.Named) readBooks("{\"exchange\": \" Alpha \", \"bids\": [], \"asks\": []}").getFirst();
 
@@ -204,20 +204,20 @@ class SnapshotReaderTest {
 
         @ParameterizedTest(name = "entry: {0}")
         @ValueSource(strings = {"[100]", "[100, 1, 7]", "[]", "null", "{}", "5", "\"100,1\""})
-        @DisplayName("D-001 an entry that is not a two-element array is read as NotAPair")
+        @DisplayName("§2 (D-001): an entry that is not a two-element array is read as NotAPair")
         void readsNotAPair(String entry) {
             assertEquals(List.of(new RawEntry.NotAPair()), readBids(entry));
         }
 
         @ParameterizedTest(name = "entry: {0}")
         @ValueSource(strings = {"[\"100.5\", 1]", "[100, \"1\"]", "[true, 1]", "[100, null]", "[[100], 1]", "[100, {}]"})
-        @DisplayName("D-002 an entry with a component that is not a JSON number is read as NonNumeric")
+        @DisplayName("§2 (D-002): an entry with a component that is not a JSON number is read as NonNumeric")
         void readsNonNumeric(String entry) {
             assertEquals(List.of(new RawEntry.NonNumeric()), readBids(entry));
         }
 
         @Test
-        @DisplayName("D-006 entry numbers are read exactly as written, zero and negative included (the §2 screen drops those)")
+        @DisplayName("Input contract (D-006): entry numbers are read exactly as written, zero and negative included (the §2 screen drops those)")
         void readsNumbersExactly() {
             assertEquals(
                     List.of(pair("1E+2", "0.1"), pair("100.20", "5"), pair("0", "-1")),
@@ -225,7 +225,7 @@ class SnapshotReaderTest {
         }
 
         @Test
-        @DisplayName("D-001 entries keep their input order, whatever their kind")
+        @DisplayName("§2 (D-001): entries keep their input order, whatever their kind")
         void keepsEntryOrder() {
             assertEquals(
                     List.of(pair("101", "1"), new RawEntry.NotAPair(), new RawEntry.NonNumeric(), pair("99", "2")),
