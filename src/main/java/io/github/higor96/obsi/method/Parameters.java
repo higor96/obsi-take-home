@@ -14,6 +14,9 @@ final class Parameters {
     /** Mid-spread cutoff D (Eq. 2, §7). */
     static final BigDecimal MID_SPREAD_CUTOFF = new BigDecimal("0.005");
 
+    /** The 0.3 in the exponential weighting parameter λ = 1/(0.3·v_T) (§5, §7). */
+    static final BigDecimal LAMBDA_DEPTH_FACTOR = new BigDecimal("0.3");
+
     private Parameters() {
     }
 }

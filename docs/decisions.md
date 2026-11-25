@@ -96,7 +96,11 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
   - Residual risk, accepted: a value within that distance of a tie, without being on it, could round differently from exact arithmetic. Hitting that needs an input built to about 15 significant digits for that purpose.
   - `StrictMath.exp` rather than `Math.exp`: the call is the same, but `StrictMath` is specified to return identical bits on every JVM. `Math.exp` may use CPU intrinsics that differ by up to 1 ulp, and the index must be reproducible.
   - An in-house series at 34 digits with no `double` was considered and dropped. It adds code to test and, outside the accepted residual case, would not change a published value.
-- **Tests:** Planned, Eq. 3. One book with bids `[[100.20, 5], [98.00, 5]]` and asks `[[100.25, 5], [102.00, 5]]`: \(\operatorname{midPV}=100.225\) for \(v=1..5\), \(v_T=5\), value `"100.23"`. Fixture: `src/test/resources/fixtures/eq3-constant-mid-tie.json`.
+- **Tests:** `IndexValueTest`:
+  - "Eq. 3 constant midPV at a .xx5 tie: v_T = 5, OBSI exactly 100.225, published 100.23 (D-007, D-014)". This is one book with bids `[[100.20, 5], [98.00, 5]]` and asks `[[100.25, 5], [102.00, 5]]`, so \(\operatorname{midPV}=100.225\) for \(v=1..5\).
+  - "Eq. 3 sample snapshot: OBSI matches the 60-digit reference to within 1e-14 and publishes as 100.23". The reference was computed independently with Python's `decimal` module. The measured error is \(1.7\times10^{-19}\).
+
+  The same tie book as JSON (`src/test/resources/fixtures/eq3-constant-mid-tie.json`): planned, end-to-end at the CLI step.
 
 ## D-008 Exit codes and usage errors
 
@@ -155,15 +159,15 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
 - **Question:** Weighted means computed with rounded intermediate steps can land just below a rounding tie. How is Eq. 3 evaluated?
 - **Decision:** Compute each weight \(w_v=\lambda e^{-\lambda v}\) (D-007). Accumulate both \(\sum_v \operatorname{midPV}_T(v)\,w_v\) and \(NF=\sum_v w_v\) with exact `BigDecimal` multiply and add, with no `MathContext`. Divide once at the end, numerator by \(NF\), at 34 significant digits (D-015). Never normalize each weight first.
 - **Why:** When \(\operatorname{midPV}_T\) is a constant \(c\), the only case in which an exact tie is possible (D-007), the numerator is exactly \(c\cdot NF\). The single division then returns exactly \(c\), and `HALF_UP` rounds it correctly. Dividing each weight by \(NF\) first rounds every term, so \(c\sum_v w_v/NF\) can come out as `x.xx4999…` and round down.
-- **Tests:** Planned, Eq. 3 constant mid-price tie (see D-007).
+- **Tests:** `IndexValueTest`: "Eq. 3 constant midPV at a .xx5 tie: v_T = 5, OBSI exactly 100.225, published 100.23 (D-007, D-014)". Rounding each numerator term to 16 digits instead turns that value into `100.2249999999999907…`, which publishes as `100.22`; the test catches it.
 
 ## D-015 Precision of steps that do not terminate
 
 - **Spec:** §7, \(\lambda=1/(0.3v_T)\); Eq. 3, division by \(NF\); §5 rounding.
 - **Question:** The spec fixes only the published rounding. What precision do the other non-terminating steps use?
-- **Decision:** Arithmetic is exact wherever the result terminates: sums, products (including the Eq. 3 numerator and \(NF\), D-014), and halving for mid-prices and the even-count median. Divisions that do not terminate (\(\lambda\) and division by \(NF\)) use 34 significant digits (`MathContext.DECIMAL128`). Only the published value is rounded to two places with `HALF_UP`.
-- **Why:** 34 digits is far beyond the two published decimals, and the spec prescribes `HALF_UP` only for the published value.
-- **Tests:** Planned, Eq. 3.
+- **Decision:** Arithmetic is exact wherever the result terminates: sums, products (including the Eq. 3 numerator and \(NF\), D-014), and halving for mid-prices and the even-count median. Divisions that do not terminate (\(\lambda\) and division by \(NF\)) use 34 significant digits (`MathContext.DECIMAL128`). The 0.3 in \(\lambda\) is `Parameters.LAMBDA_DEPTH_FACTOR`, passed in like the other §7 values. Only the published value is rounded to two places with `HALF_UP`.
+- **Why:** 34 digits is far beyond the two published decimals, and the spec prescribes `HALF_UP` only for the published value. The published value is the 34-digit quotient rounded again to two places. That double rounding could only change a result within \(10^{-32}\) of a tie, far inside the residual D-007 already accepts.
+- **Tests:** `IndexValueTest`: "§5 the published value is rounded to two decimals with HALF_UP" (100.2249 → 100.22, 100.225 → 100.23, 100.2251 → 100.23, 100.125 → 100.13) and "Eq. 3 with v_T = s the index is midPV(s) exactly, published with two decimals".
 
 ## D-016 Output formatting
 
