@@ -1,8 +1,10 @@
 package io.github.higor96.obsi.input;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.DisplayName;
@@ -43,5 +45,21 @@ class ExactJsonTest {
 
         assertEquals(new BigDecimal("5"), numbers.get(0).decimalValue());
         assertEquals(new BigDecimal("123456789012345678901234567890"), numbers.get(1).decimalValue());
+    }
+
+    @Test
+    @DisplayName("§2 malformed input (D-006): content after the JSON document is rejected")
+    void contentAfterTheDocumentIsRejected() {
+        assertThrows(JsonProcessingException.class, () -> ExactJson.read("{\"a\": 1} {\"b\": 2}"));
+        assertThrows(JsonProcessingException.class, () -> ExactJson.read("[1] 2"));
+    }
+
+    @Test
+    @DisplayName("§2 malformed input (D-006): a key repeated in one object is rejected, at any depth")
+    void repeatedKeyIsRejected() {
+        assertThrows(JsonProcessingException.class,
+                () -> ExactJson.read("{\"calculationTime\": \"a\", \"calculationTime\": \"b\"}"));
+        assertThrows(JsonProcessingException.class,
+                () -> ExactJson.read("{\"books\": [{\"exchange\": \"Alpha\", \"bids\": [], \"bids\": []}]}"));
     }
 }

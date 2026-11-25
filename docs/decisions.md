@@ -40,7 +40,7 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
 
 - **Spec:** Input contract, `calculationTime` is an "ISO-8601 UTC string"; failure output, `calculationTime` is "Echo the input calculation time, or null if non-conforming input"; §2, missing required top-level fields are input errors.
 - **Question:** Which strings count as ISO-8601 UTC, what is echoed, and when is the failure output's `calculationTime` `null`?
-- **Decision:** Accept a string that `Instant.parse` reads and that ends in `Z`. Offsets such as `+00:00` or `+01:00` are input errors; `Instant.parse` alone accepts offsets, so the `Z` check is explicit. Echo the input string unchanged, never a reformatted instant. On failure, echo it whenever it is valid. It is `null` only when it is missing or invalid, or when the file is not readable JSON.
+- **Decision:** Accept a string that `Instant.parse` reads and that ends in `Z`. Offsets such as `+00:00` or `+01:00` are input errors; `Instant.parse` alone accepts offsets, so the `Z` check is explicit. Echo the input string unchanged, never a reformatted instant. On failure, echo it whenever it is valid. It is `null` only when it is missing or invalid, or when the file is not readable JSON, which includes content after the document and a repeated key (D-006).
 - **Why:** The contract asks for UTC. Echoing the original string avoids reformatting differences such as dropped fractional seconds. A valid time still identifies the failed snapshot when another field is malformed.
 - **Tests:** Planned, input reader and CLI.
 
@@ -54,12 +54,19 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
 
 ## D-006 Jackson parses the input, with numbers read straight into `BigDecimal`
 
-- **Spec:** Input contract, `price, size` are JSON numbers; assessment FAQ, "Prefer small, well-understood libraries".
-- **Question:** How is the JSON parsed without a number ever passing through `double`?
-- **Decision:** Jackson databind 2.22.4 with two settings. `DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS` is enabled, so floating-point numbers parse from the JSON text straight to `BigDecimal`. `JsonNodeFeature.STRIP_TRAILING_BIGDECIMAL_ZEROES` is disabled, so `100.20` keeps the scale it was written with. Integers already arrive exact. Jackson is bundled into `target/obsi.jar` with maven-shade, so `run.sh` stays unchanged. Jackson is used only in `input/`; the calculation classes see plain records.
+- **Spec:** Input contract, `price, size` are JSON numbers; §2, "Malformed top-level input ... are input errors"; assessment FAQ, "Prefer small, well-understood libraries".
+- **Question:** How is the JSON parsed without a number ever passing through `double`, and what counts as malformed JSON?
+- **Decision:** Jackson databind 2.22.4 with four settings:
+  - `DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS` is enabled, so floating-point numbers parse from the JSON text straight to `BigDecimal`. Integers already arrive exact.
+  - `JsonNodeFeature.STRIP_TRAILING_BIGDECIMAL_ZEROES` is disabled, so `100.20` keeps the scale it was written with.
+  - `DeserializationFeature.FAIL_ON_TRAILING_TOKENS` is enabled, so content after the JSON document is rejected.
+  - `StreamReadFeature.STRICT_DUPLICATE_DETECTION` is enabled, so a key repeated in one object is rejected at any depth.
+
+  The last two make the whole file unreadable, so the snapshot fails with `calculationTime: null` (D-004). That holds even when the repeated key is inside one book: this is the one book-level problem that fails the snapshot (see D-003). Jackson is bundled into `target/obsi.jar` with maven-shade, so `run.sh` stays unchanged. Jackson is used only in `input/`; the calculation classes see plain records.
 - **Why:**
   - Jackson is well known and well tested. A hand-written parser would be more code to test for no gain in the calculation.
-  - Both settings are needed. With Jackson's defaults, `100.1234567890123456789012345` and `1e400` arrive as `double`. With only the first setting, `100.20` still comes back as `100.2`.
+  - Both number settings are needed. With Jackson's defaults, `100.1234567890123456789012345` and `1e400` arrive as `double`. With only the first setting, `100.20` still comes back as `100.2`.
+  - Without the two strictness settings, Jackson silently ignores content after the document and keeps the last value of a repeated key. The calculation would then run on data the file does not state unambiguously. A file with a repeated key is not reliably readable JSON, so it fails as a whole rather than book by book.
   - Version 2.x rather than 3.x: 2.x is the API most Java engineers know, and it is still maintained. 2.23.0 was released on 2026-11-24, too recently to adopt.
 - **Tests:** `ExactJsonTest`.
 
