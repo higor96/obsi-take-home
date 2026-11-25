@@ -233,6 +233,45 @@ class SnapshotReaderTest {
         }
     }
 
+    @Nested
+    class NumberRange {
+
+        private static final String OUT_OF_RANGE = "input has a number outside the supported range";
+
+        @Test
+        @DisplayName("Input contract (D-019): a number whose exponent the parser cannot hold is an input error, with no time to echo")
+        void exponentBeyondTheParserIsAnInputError() {
+            InputError error = assertThrows(InputError.class, () -> readBids("[99.9, 1e-2147483648]"));
+
+            assertEquals(OUT_OF_RANGE, error.getMessage());
+            assertEquals(Optional.empty(), error.calculationTime());
+        }
+
+        @ParameterizedTest(name = "entry: {0}")
+        @ValueSource(strings = {"[1e1000, 1]", "[100, 1e-1000]", "[100, 1e999999999]"})
+        @DisplayName("Input contract (D-019): a number needing more than 1000 digits written out is an input error that echoes a valid time")
+        void numberBeyondOneThousandDigitsIsAnInputError(String entry) {
+            InputError error = assertThrows(InputError.class, () -> readBids(entry));
+
+            assertEquals(OUT_OF_RANGE, error.getMessage());
+            assertEquals(Optional.of("2026-10-27T12:00:00Z"), error.calculationTime());
+        }
+
+        @Test
+        @DisplayName("Input contract (D-019): numbers needing exactly 1000 digits written out are read")
+        void numbersOfExactlyOneThousandDigitsAreRead() {
+            assertEquals(List.of(pair("1e999", "1e-999")), readBids("[1e999, 1e-999]"));
+        }
+    }
+
+    @Test
+    @DisplayName("Input contract (D-020): a leading UTF-8 byte order mark is ignored")
+    void leadingByteOrderMarkIsIgnored() {
+        Snapshot snapshot = SnapshotReader.read("﻿{" + TIME + ", \"books\": []}");
+
+        assertEquals("2026-10-27T12:00:00Z", snapshot.calculationTime());
+    }
+
     private static List<RawBook> readBooks(String booksContent) {
         return SnapshotReader.read("{" + TIME + ", \"books\": [" + booksContent + "]}").books();
     }

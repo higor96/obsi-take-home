@@ -113,7 +113,7 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
 
   Every failure prints the failure JSON on stderr and nothing on stdout. An unexpected exception, which would be a bug, is still reported that way, as `internal error: ...` with exit 1, never as a stack trace. `--new-ped` is recognised, but until Task 2 it fails with `--new-ped is not implemented yet` and exit 2. Both streams are written as UTF-8 with `\n` line endings, whatever the platform default.
 - **Why:** Separates a caller's mistake from a snapshot that cannot be published, while keeping one machine-readable failure shape on the designated stream.
-- **Tests:** `MainTest`: "D-008 CLI: a missing input file fails with calculationTime null and exit 1", "D-008 CLI: no input path, two paths, or an unknown option is a usage error: failure JSON on stderr, exit 2" and "D-008 CLI: --new-ped is recognised but fails until the Task 2 calculation exists". Every `MainTest` failure case also checks that stdout stays empty. The `internal error` path has no test, because no valid input reaches it.
+- **Tests:** `MainTest`: "D-008 CLI: a missing input file fails with calculationTime null and exit 1", "D-008 CLI: no input path, two paths, or an unknown option is a usage error: failure JSON on stderr, exit 2" and "D-008 CLI: --new-ped is recognised but fails until the Task 2 calculation exists". Every `MainTest` failure case also checks that stdout stays empty. The `internal error` path has no test. The independent review (R-08) found valid JSON numbers with extreme exponents that reached it; D-019 now reports those as input errors, and no other input is known to reach it.
 
 ## D-009 Best bid and best ask are the extreme prices, not the first entries
 
@@ -197,3 +197,22 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
 - **Decision:** No. The reader ignores any field it does not use, at the top level and in each book.
 - **Why:** Extra fields do not affect the calculation. Task 2 may add input fields (`data/new-ped.json`), and the baseline should still read such a file.
 - **Tests:** `SnapshotReaderTest`: "D-018 fields outside the input contract are ignored, at the top level and in books".
+
+## D-019 Numbers must fit 1000 digits written out
+
+- **Spec:** Input contract, `price, size` are "positive JSON numbers"; §2, malformed input is an input error; `CLAUDE.md`, JSON numbers go straight into `BigDecimal`.
+- **Question:** JSON allows any exponent. `1e-2147483648` cannot be held by `BigDecimal`. `1e999999999` can, but adding it to an ordinary size overflows. Both used to end as `internal error` (review R-08). What should happen?
+- **Decision:** Both are input errors with the reason `input has a number outside the supported range`.
+  - A number the parser cannot hold fails before `calculationTime` is read, so the output has `calculationTime: null`.
+  - Otherwise the reader rejects any price or size that needs more than 1000 digits written out without an exponent: integer digits plus decimal places. That output echoes a valid `calculationTime` (D-004).
+  - Exactly 1000 digits, such as `1e999` or `1e-999`, is read.
+- **Why:** 1000 is Jackson's default limit on a number's written length, so the bound matches what the parser already enforces for plain numbers. It keeps every later sum and product far inside `BigDecimal`'s range. No real price or size comes near it.
+- **Tests:** `SnapshotReaderTest`, `NumberRange`.
+
+## D-020 A leading UTF-8 byte order mark is ignored
+
+- **Spec:** Input contract, the input is JSON.
+- **Question:** A file that starts with a UTF-8 byte order mark (BOM) used to fail as invalid JSON, with the invisible character in the reason (review R-10). Should it?
+- **Decision:** No. The reader drops one leading U+FEFF before parsing.
+- **Why:** RFC 8259 lets a JSON parser ignore a leading BOM. Some editors and exporters add one, and it says nothing about the data.
+- **Tests:** `SnapshotReaderTest`: "Input contract (D-020): a leading UTF-8 byte order mark is ignored".

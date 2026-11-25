@@ -3,6 +3,7 @@ package io.github.higor96.obsi.input;
 import com.fasterxml.jackson.core.JsonLocation;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -15,19 +16,34 @@ import java.util.List;
  */
 public final class SnapshotReader {
 
+    private static final String BYTE_ORDER_MARK = "﻿";
+
+    /**
+     * Most digits a number may need when written out without an exponent (D-019). It matches
+     * Jackson's default limit on a written number's length, and keeps every later sum and
+     * product far from {@code BigDecimal}'s range.
+     */
+    private static final long MAX_WRITTEN_DIGITS = 1000;
+
+    private static final String OUT_OF_RANGE = "input has a number outside the supported range";
+
     private SnapshotReader() {
     }
 
     /**
-     * @throws InputError if the text is not readable JSON, is not an object, or lacks a valid
-     *     {@code calculationTime} or a {@code books} array
+     * @throws InputError if the text is not readable JSON, is not an object, lacks a valid
+     *     {@code calculationTime} or a {@code books} array, or holds a number outside the
+     *     supported range
      */
     public static Snapshot read(String json) {
         JsonNode root;
         try {
-            root = ExactJson.read(json);
+            root = ExactJson.read(json.startsWith(BYTE_ORDER_MARK) ? json.substring(1) : json);  // D-020
         } catch (JsonProcessingException e) {
             throw InputError.withoutCalculationTime(describe(e));
+        } catch (NumberFormatException e) {
+            // Jackson cannot hold the exponent, e.g. 1e-2147483648 (D-019).
+            throw InputError.withoutCalculationTime(OUT_OF_RANGE);
         }
         if (root == null || root.isMissingNode()) {
             // Jackson returns a missing node, rather than throwing, for empty or blank input.
@@ -45,8 +61,12 @@ public final class SnapshotReader {
             throw InputError.withCalculationTime("books must be an array", calculationTime);
         }
         List<RawBook> rawBooks = new ArrayList<>();
-        for (JsonNode book : books) {
-            rawBooks.add(readBook(book));
+        try {
+            for (JsonNode book : books) {
+                rawBooks.add(readBook(book));
+            }
+        } catch (NumberOutOfRange e) {
+            throw InputError.withCalculationTime(OUT_OF_RANGE, calculationTime);
         }
         return new Snapshot(calculationTime, rawBooks);
     }
@@ -109,7 +129,25 @@ public final class SnapshotReader {
         if (!price.isNumber() || !size.isNumber()) {
             return new RawEntry.NonNumeric();
         }
-        return new RawEntry.Pair(price.decimalValue(), size.decimalValue());
+        return new RawEntry.Pair(withinRange(price.decimalValue()), withinRange(size.decimalValue()));
+    }
+
+    /** D-019: integer digits plus decimal places, as the number would be written without an exponent. */
+    private static BigDecimal withinRange(BigDecimal value) {
+        long integerDigits = Math.max((long) value.precision() - value.scale(), 1);
+        long decimalPlaces = Math.max(value.scale(), 0);
+        if (integerDigits + decimalPlaces > MAX_WRITTEN_DIGITS) {
+            throw new NumberOutOfRange();
+        }
+        return value;
+    }
+
+    /** Raised while reading books, then reported as an input error with the calculation time. */
+    private static final class NumberOutOfRange extends RuntimeException {
+
+        NumberOutOfRange() {
+            super(null, null, false, false);
+        }
     }
 
     private static String describe(JsonProcessingException e) {
