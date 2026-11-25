@@ -12,10 +12,11 @@ final class UtilizedDepth {
      * Eq. 2: the largest sampled volume v_i = i·s with midSV(v_i) ≤ D and midSV(v_{i+1}) &gt; D,
      * evaluating a candidate only where both curves are defined at v_i and v_{i+1}.
      *
-     * <p>The curves are defined on (0, total size of the shallower side], so once v_{i+1} is
-     * undefined every later sample is too, and the search stops there. midSV is also
-     * non-decreasing in v for an uncrossed book (askPV only rises and bidPV only falls), so the
-     * set has at most one element. The loop still keeps the largest, as Eq. 2 is written.
+     * <p>midSV never decreases in v for an uncrossed book: askPV only rises and bidPV only falls
+     * (D-017). So once a sample is above D no later one is within it, and the first crossing is
+     * the only element of the set, hence its maximum. The scan stops there, or as soon as a
+     * sample is above D, instead of running to the end of the book. The curves are defined on
+     * (0, total size of the shallower side], so it also stops at the first undefined v_{i+1}.
      *
      * @throws CalculationFailure if the set is empty (§6)
      */
@@ -25,16 +26,14 @@ final class UtilizedDepth {
             throw new CalculationFailure(
                     "insufficient depth: the price-volume curves do not reach two consecutive sample volumes");
         }
-        BigDecimal deepestCrossing = null;
         for (BigDecimal v = s; curves.isDefinedAt(v.add(s)); v = v.add(s)) {
-            BigDecimal next = v.add(s);
-            if (curves.midSpreadAtMost(v, cutoff) && !curves.midSpreadAtMost(next, cutoff)) {
-                deepestCrossing = v;
+            if (!curves.midSpreadAtMost(v, cutoff)) {
+                break;
+            }
+            if (!curves.midSpreadAtMost(v.add(s), cutoff)) {
+                return v;
             }
         }
-        if (deepestCrossing == null) {
-            throw new CalculationFailure("no mid-spread cutoff crossing before the price-volume curves end");
-        }
-        return deepestCrossing;
+        throw new CalculationFailure("no mid-spread cutoff crossing before the price-volume curves end");
     }
 }

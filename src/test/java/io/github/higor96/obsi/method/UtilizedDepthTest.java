@@ -4,8 +4,10 @@ import static io.github.higor96.obsi.method.TestData.level;
 import static io.github.higor96.obsi.method.TestData.sampleUncrossedBook;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,6 +18,35 @@ class UtilizedDepthTest {
             "insufficient depth: the price-volume curves do not reach two consecutive sample volumes";
     private static final String NO_CROSSING =
             "no mid-spread cutoff crossing before the price-volume curves end";
+
+    /**
+     * Guard only: the code under test answers in milliseconds, so this never decides a passing
+     * run. A scan to the end of a book 1e12 XYZ deep would take days and trip it instead.
+     */
+    private static final Duration GUARD = Duration.ofSeconds(10);
+
+    @Test
+    @DisplayName("Eq. 2 stops at the crossing: a book 1e12 XYZ deep with its crossing at v = 2 returns v_T = 2 at once (D-017)")
+    void stopsAtTheCrossing() {
+        PriceVolumeCurves curves = curves(
+                List.of(level("100", "2"), level("90", "1e12")),
+                List.of(level("100.1", "2"), level("110", "1e12")));
+
+        BigDecimal depth = assertTimeoutPreemptively(GUARD, () -> UtilizedDepth.of(curves, Parameters.MID_SPREAD_CUTOFF));
+
+        assertDepth("2", depth);
+    }
+
+    @Test
+    @DisplayName("§6 Eq. 2 fails at once when midSV is above D at the first sample of a book 1e12 XYZ deep (D-017)")
+    void failsAtOnceWhenAboveCutoffFromTheStartOfADeepBook() {
+        PriceVolumeCurves curves = curves(List.of(level("90", "1e12")), List.of(level("110", "1e12")));
+
+        CalculationFailure failure = assertTimeoutPreemptively(GUARD,
+                () -> assertThrows(CalculationFailure.class, () -> UtilizedDepth.of(curves, Parameters.MID_SPREAD_CUTOFF)));
+
+        assertEquals(NO_CROSSING, failure.getMessage());
+    }
 
     @Test
     @DisplayName("Eq. 2 sample snapshot: midSV crosses D between v = 4 and v = 5, so v_T = 4")
