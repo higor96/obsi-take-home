@@ -21,7 +21,7 @@ class MainTest {
     Path tempDir;
 
     @Test
-    @DisplayName("CLI: data/sample-input.json publishes 100.23 on stdout with exit 0 and nothing on stderr")
+    @DisplayName("§2–§5 CLI: data/sample-input.json publishes 100.23 on stdout with exit 0 and nothing on stderr")
     void sampleInputPublishes() {
         Result result = run("data/sample-input.json");
 
@@ -42,7 +42,7 @@ class MainTest {
     }
 
     @Test
-    @DisplayName("CLI: the constant mid-price tie fixture publishes 100.23 with v_T = 5 (D-007, D-014)")
+    @DisplayName("Eq. 3 CLI: the constant mid-price tie fixture publishes 100.23 with v_T = 5 (D-007, D-014)")
     void constantMidPriceTiePublishes() {
         Result result = run("src/test/resources/fixtures/eq3-constant-mid-tie.json");
 
@@ -116,7 +116,7 @@ class MainTest {
     }
 
     @Test
-    @DisplayName("CLI: --new-ped is recognised but fails until the Task 2 calculation exists")
+    @DisplayName("D-008 CLI: --new-ped is recognised but fails until the Task 2 calculation exists")
     void newPedIsNotImplementedYet() {
         assertFailure(run("--new-ped", "data/sample-input.json"), Main.USAGE_ERROR, null,
                 "--new-ped is not implemented yet");

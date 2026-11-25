@@ -100,7 +100,7 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
   - "Eq. 3 constant midPV at a .xx5 tie: v_T = 5, OBSI exactly 100.225, published 100.23 (D-007, D-014)". This is one book with bids `[[100.20, 5], [98.00, 5]]` and asks `[[100.25, 5], [102.00, 5]]`, so \(\operatorname{midPV}=100.225\) for \(v=1..5\).
   - "Eq. 3 sample snapshot: OBSI matches the 60-digit reference to within 1e-14 and publishes as 100.23". The reference was computed independently with Python's `decimal` module. The measured error is \(1.7\times10^{-19}\).
 
-  `MainTest`: "CLI: the constant mid-price tie fixture publishes 100.23 with v_T = 5 (D-007, D-014)" runs the same book from `src/test/resources/fixtures/eq3-constant-mid-tie.json` through the CLI.
+  `MainTest`: "Eq. 3 CLI: the constant mid-price tie fixture publishes 100.23 with v_T = 5 (D-007, D-014)" runs the same book from `src/test/resources/fixtures/eq3-constant-mid-tie.json` through the CLI.
 
 ## D-008 Exit codes and usage errors
 
@@ -113,7 +113,7 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
 
   Every failure prints the failure JSON on stderr and nothing on stdout. An unexpected exception, which would be a bug, is still reported that way, as `internal error: ...` with exit 1, never as a stack trace. `--new-ped` is recognised, but until Task 2 it fails with `--new-ped is not implemented yet` and exit 2. Both streams are written as UTF-8 with `\n` line endings, whatever the platform default.
 - **Why:** Separates a caller's mistake from a snapshot that cannot be published, while keeping one machine-readable failure shape on the designated stream.
-- **Tests:** `MainTest`: "D-008 CLI: a missing input file fails with calculationTime null and exit 1", "D-008 CLI: no input path, two paths, or an unknown option is a usage error: failure JSON on stderr, exit 2" and "CLI: --new-ped is recognised but fails until the Task 2 calculation exists". Every `MainTest` failure case also checks that stdout stays empty. The `internal error` path has no test, because no valid input reaches it.
+- **Tests:** `MainTest`: "D-008 CLI: a missing input file fails with calculationTime null and exit 1", "D-008 CLI: no input path, two paths, or an unknown option is a usage error: failure JSON on stderr, exit 2" and "D-008 CLI: --new-ped is recognised but fails until the Task 2 calculation exists". Every `MainTest` failure case also checks that stdout stays empty. The `internal error` path has no test, because no valid input reaches it.
 
 ## D-009 Best bid and best ask are the extreme prices, not the first entries
 
@@ -137,7 +137,7 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
 - **Question:** Does the list include books excluded for structure, for PED, or both?
 - **Decision:** Both, in input order, each exchange once.
 - **Why:** §2, "Constituent order book screens", covers both checks. The sample input excludes Gamma (crossed book) and Delta (PED).
-- **Tests:** `BookScreenTest`: "§2 sample snapshot: Gamma (crossed) and Delta (PED) are excluded, in input order (D-011)" and "§2 excluded exchanges keep input order across the structural and PED screens (D-011)". `MainTest`: "CLI: data/sample-input.json publishes 100.23 on stdout with exit 0 and nothing on stderr".
+- **Tests:** `BookScreenTest`: "§2 sample snapshot: Gamma (crossed) and Delta (PED) are excluded, in input order (D-011)" and "§2 excluded exchanges keep input order across the structural and PED screens (D-011)". `MainTest`: "§2–§5 CLI: data/sample-input.json publishes 100.23 on stdout with exit 0 and nothing on stderr".
 
 ## D-012 The PED limit is compared exactly
 
@@ -180,7 +180,7 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
 - **Question:** How are the decimal strings and the JSON layout written?
 - **Decision:** `value` is written with `setScale(2, RoundingMode.HALF_UP).toPlainString()`. `utilizedDepth` is written with `toPlainString()` and no trailing zeros (`"4"`, never `"4.0"` or `"4E+0"`). The JSON is pretty-printed with two-space indentation and fields in the PDF's order. `excludedExchanges` is written on one line, `[]` when empty. Strings are escaped with Jackson's `JsonStringEncoder`.
 - **Why:** This matches the PDF examples, and `toPlainString()` never uses scientific notation.
-- **Tests:** `ResultJsonTest`: both output shapes as exact text, an empty array without exponent notation, and escaping of quotes, backslashes and control characters. `MainTest`: "CLI: data/sample-input.json publishes 100.23 on stdout with exit 0 and nothing on stderr", compared as exact text.
+- **Tests:** `ResultJsonTest`: both output shapes as exact text, an empty array without exponent notation, and escaping of quotes, backslashes and control characters. `MainTest`: "§2–§5 CLI: data/sample-input.json publishes 100.23 on stdout with exit 0 and nothing on stderr", compared as exact text.
 
 ## D-017 Eq. 2 is evaluated as written, although its set has at most one element
 
