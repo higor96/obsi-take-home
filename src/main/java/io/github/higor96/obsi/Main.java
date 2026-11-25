@@ -3,9 +3,12 @@ package io.github.higor96.obsi;
 import io.github.higor96.obsi.input.InputError;
 import io.github.higor96.obsi.input.Snapshot;
 import io.github.higor96.obsi.input.SnapshotReader;
+import io.github.higor96.obsi.input.SnapshotWithUnlocks;
 import io.github.higor96.obsi.method.CalculationFailure;
 import io.github.higor96.obsi.method.ObsiCalculator;
+import io.github.higor96.obsi.method.PedLimitRule;
 import io.github.higor96.obsi.method.Publication;
+import io.github.higor96.obsi.method.RegimePedLimit;
 import io.github.higor96.obsi.method.StaticPedLimit;
 import io.github.higor96.obsi.output.ResultJson;
 import java.io.FileDescriptor;
@@ -59,18 +62,16 @@ public final class Main {
         if (paths.size() != 1) {
             return fail(err, Optional.empty(), "expected one input file; " + USAGE, USAGE_ERROR);
         }
-        if (newPed) {
-            return fail(err, Optional.empty(), "--new-ped is not implemented yet", USAGE_ERROR);
-        }
         try {
-            return calculate(Path.of(paths.getFirst()), out, err);
+            return calculate(Path.of(paths.getFirst()), newPed, out, err);
         } catch (RuntimeException e) {
             // A bug, not a property of the snapshot: still one JSON object on stderr, never a stack trace.
             return fail(err, Optional.empty(), "internal error: " + e, FAILED);
         }
     }
 
-    private static int calculate(Path input, PrintStream out, PrintStream err) {
+    /** {@code newPed} selects the Task 2 regime PED rule instead of the static 5% (D-021). */
+    private static int calculate(Path input, boolean newPed, PrintStream out, PrintStream err) {
         String json;
         try {
             json = Files.readString(input);
@@ -82,14 +83,22 @@ public final class Main {
         }
 
         Snapshot snapshot;
+        PedLimitRule pedLimit;
         try {
-            snapshot = SnapshotReader.read(json);
+            if (newPed) {
+                SnapshotWithUnlocks withUnlocks = SnapshotReader.readWithUnlockEvents(json);
+                snapshot = withUnlocks.snapshot();
+                pedLimit = new RegimePedLimit(withUnlocks.unlockStarts());
+            } else {
+                snapshot = SnapshotReader.read(json);
+                pedLimit = StaticPedLimit.baseline();
+            }
         } catch (InputError e) {
             return fail(err, e.calculationTime(), e.getMessage(), FAILED);
         }
 
         try {
-            Publication publication = ObsiCalculator.calculate(snapshot, StaticPedLimit.baseline());
+            Publication publication = ObsiCalculator.calculate(snapshot, pedLimit);
             out.print(ResultJson.published(snapshot.calculationTime(), publication) + "\n");
             return PUBLISHED;
         } catch (CalculationFailure e) {

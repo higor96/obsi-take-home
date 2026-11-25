@@ -112,9 +112,9 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
   - **Exit 1:** any failed calculation or input error. An unreadable file is reported with `calculationTime: null` and a reason such as `cannot read input file data/x.json: no such file`.
   - **Exit 2:** a usage error, meaning no input path, more than one path, or an unknown `--` option. The reason ends with `usage: ./run.sh [--new-ped] <input.json>`.
 
-  Every failure prints the failure JSON on stderr and nothing on stdout. An unexpected exception, which would be a bug, is still reported that way, as `internal error: ...` with exit 1, never as a stack trace. `--new-ped` is recognised, but until Task 2 it fails with `--new-ped is not implemented yet` and exit 2. Both streams are written as UTF-8 with `\n` line endings, whatever the platform default.
+  Every failure prints the failure JSON on stderr and nothing on stdout. An unexpected exception, which would be a bug, is still reported that way, as `internal error: ...` with exit 1, never as a stack trace. `--new-ped` selects the Task 2 regime PED rule (D-021); with it, an invalid `unlockEvents` is an input error (D-024). Both streams are written as UTF-8 with `\n` line endings, whatever the platform default.
 - **Why:** Separates a caller's mistake from a snapshot that cannot be published, while keeping one machine-readable failure shape on the designated stream.
-- **Tests:** `MainTest`: "CLI contract (D-008): a missing input file fails with calculationTime null and exit 1", "CLI contract (D-008): no input path, two paths, or an unknown option is a usage error: failure JSON on stderr, exit 2" and "CLI contract (D-008): --new-ped is recognised but fails until the Task 2 calculation exists". Every `MainTest` failure case also checks that stdout stays empty. The `internal error` path has no test. The independent review (R-08) found valid JSON numbers with extreme exponents that reached it; D-019 now reports those as input errors, and no other input is known to reach it.
+- **Tests:** `MainTest`: "CLI contract (D-008): a missing input file fails with calculationTime null and exit 1" and "CLI contract (D-008): no input path, two paths, or an unknown option is a usage error: failure JSON on stderr, exit 2". Every `MainTest` failure case also checks that stdout stays empty. The `internal error` path has no test. The independent review (R-08) found valid JSON numbers with extreme exponents that reached it; D-019 now reports those as input errors, and no other input is known to reach it.
 
 ## D-009 Best bid and best ask are the extreme prices, not the first entries
 
@@ -224,7 +224,7 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
 - **Question:** The baseline fixes the limit at 5%. Task 2 needs a second rule, selected by `--new-ped`, with the rest of the methodology unchanged. Where does the choice live?
 - **Decision:** A `PedLimitRule` interface gives the limit, in percent, for a snapshot's calculation time. `StaticPedLimit` is the baseline: 5% at any time. `ObsiCalculator.calculate(snapshot, rule)` asks the rule once and passes the limit to the unchanged §2 screen (D-012). The CLI picks the rule.
 - **Why:** Only the limit differs between the two methodologies. One seam keeps the baseline untouched and gives each rule its own tests.
-- **Tests:** `StaticPedLimitTest`; `ObsiCalculatorTest`.
+- **Tests:** `StaticPedLimitTest`; `ObsiCalculatorTest`. `MainTest`: "Task 2 CLI (D-021, D-026): --new-ped data/new-ped.json applies the 2% unlock limit and excludes Epsilon" and "Task 2 CLI (D-018, D-021): without --new-ped the same file uses the static 5% and keeps Epsilon". The expected values come from an independent Python calculation of the spec, which also agrees with `--new-ped` in every regime.
 
 ## D-022 Task 2: the weekend is the UTC calendar weekend
 
@@ -252,7 +252,7 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
   - Under `--new-ped`, a field that is not an array of such strings is an input error, because a bad schedule must not silently change the limit.
   - The baseline ignores the field (D-018).
 - **Why:** Start times are what is announced, so the input carries exactly that. The calculator stays stateless: each snapshot carries the schedule it needs.
-- **Tests:** `RegimePedLimitTest`: "Task 2 PED (D-024, D-025): an unlock window runs from its start, inclusive, for 48 hours, exclusive, at 2%", "Task 2 PED (D-024): an unlock that has not started yet does not apply" and "Task 2 PED (D-024): with several unlock events, any open window applies, whatever their order". Reading `unlockEvents`: planned, reader.
+- **Tests:** `RegimePedLimitTest`: "Task 2 PED (D-024, D-025): an unlock window runs from its start, inclusive, for 48 hours, exclusive, at 2%", "Task 2 PED (D-024): an unlock that has not started yet does not apply" and "Task 2 PED (D-024): with several unlock events, any open window applies, whatever their order". `SnapshotReaderTest`, `UnlockEvents`: start times read in order, absent or empty means none, eight malformed shapes rejected with the time echoed, the baseline ignoring the field, and snapshot errors reported first. `MainTest`: "Task 2 CLI (D-024): --new-ped with malformed unlockEvents is an input error that echoes the time".
 
 ## D-025 Task 2: regime limits are named estimates awaiting calibration
 
@@ -268,4 +268,4 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
 - **Question:** Should the `--new-ped` output say which regime and limit applied?
 - **Decision:** No. `--new-ped` prints the same two shapes as the baseline.
 - **Why:** Existing consumers keep working. Showing the regime would help transparency, so `proposal.md` lists it as a production gap.
-- **Tests:** Planned, CLI.
+- **Tests:** `MainTest`: "Task 2 CLI (D-021, D-026): --new-ped data/new-ped.json applies the 2% unlock limit and excludes Epsilon" compares the full output text.

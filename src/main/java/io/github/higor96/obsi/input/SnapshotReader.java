@@ -36,6 +36,43 @@ public final class SnapshotReader {
      *     supported range
      */
     public static Snapshot read(String json) {
+        return snapshotFrom(parseObject(json));
+    }
+
+    /**
+     * Task 2: the snapshot plus the optional {@code unlockEvents} (D-024). Only {@code --new-ped}
+     * reads that field; {@link #read} ignores it like any other extra field (D-018).
+     *
+     * @throws InputError as {@link #read} does, or if {@code unlockEvents} is present but not an
+     *     array of ISO-8601 UTC times ending in Z
+     */
+    public static SnapshotWithUnlocks readWithUnlockEvents(String json) {
+        JsonNode root = parseObject(json);
+        Snapshot snapshot = snapshotFrom(root);
+        return new SnapshotWithUnlocks(snapshot, readUnlockStarts(root.get("unlockEvents"), snapshot.calculationTime()));
+    }
+
+    /** D-024: absent means none; otherwise an array of strings read like {@code calculationTime}. */
+    private static List<Instant> readUnlockStarts(JsonNode node, String calculationTime) {
+        if (node == null) {
+            return List.of();
+        }
+        InputError invalid = InputError.withCalculationTime(
+                "unlockEvents must be an array of ISO-8601 UTC times ending in Z", calculationTime);
+        if (!node.isArray()) {
+            throw invalid;
+        }
+        List<Instant> starts = new ArrayList<>();
+        for (JsonNode start : node) {
+            if (!start.isTextual() || !isUtcInstant(start.textValue())) {
+                throw invalid;
+            }
+            starts.add(Instant.parse(start.textValue()));
+        }
+        return starts;
+    }
+
+    private static JsonNode parseObject(String json) {
         JsonNode root;
         try {
             root = ExactJson.read(json.startsWith(BYTE_ORDER_MARK) ? json.substring(1) : json);  // D-020
@@ -52,6 +89,10 @@ public final class SnapshotReader {
         if (!root.isObject()) {
             throw InputError.withoutCalculationTime("input must be a JSON object");
         }
+        return root;
+    }
+
+    private static Snapshot snapshotFrom(JsonNode root) {
         String calculationTime = readCalculationTime(root.get("calculationTime"));
         JsonNode books = root.get("books");
         if (books == null) {

@@ -116,10 +116,54 @@ class MainTest {
     }
 
     @Test
-    @DisplayName("CLI contract (D-008): --new-ped is recognised but fails until the Task 2 calculation exists")
-    void newPedIsNotImplementedYet() {
-        assertFailure(run("--new-ped", "data/sample-input.json"), Main.USAGE_ERROR, null,
-                "--new-ped is not implemented yet");
+    @DisplayName("Task 2 CLI (D-021, D-026): --new-ped data/new-ped.json applies the 2% unlock limit and excludes Epsilon")
+    void newPedAppliesTheUnlockLimit() {
+        // Expected values from an independent Python calculation of the spec at a 2% PED limit.
+        Result result = run("--new-ped", "data/new-ped.json");
+
+        assertEquals(Main.PUBLISHED, result.exitCode());
+        assertEquals("""
+                {
+                  "index": "OBSI",
+                  "calculationTime": "2026-10-27T12:00:00Z",
+                  "status": "published",
+                  "value": "100.21",
+                  "metadata": {
+                    "utilizedDepth": "5",
+                    "excludedExchanges": ["Gamma", "Delta", "Epsilon"]
+                  }
+                }
+                """, result.out());
+        assertEquals("", result.err());
+    }
+
+    @Test
+    @DisplayName("Task 2 CLI (D-018, D-021): without --new-ped the same file uses the static 5% and keeps Epsilon")
+    void baselineKeepsEpsilon() {
+        // Expected values from an independent Python calculation of the spec at a 5% PED limit.
+        JsonNode output = parse(run("data/new-ped.json").out());
+
+        assertEquals("100.35", output.get("value").textValue());
+        assertEquals("3", output.get("metadata").get("utilizedDepth").textValue());
+        assertEquals("[\"Gamma\",\"Delta\"]", output.get("metadata").get("excludedExchanges").toString());
+    }
+
+    @Test
+    @DisplayName("Task 2 CLI (D-022, D-024): --new-ped with no unlockEvents on a weekday uses 3%, so the sample publishes 100.23 as before")
+    void newPedOnTheSampleMatchesTheBaseline() {
+        Result result = run("--new-ped", "data/sample-input.json");
+
+        assertEquals(Main.PUBLISHED, result.exitCode());
+        assertEquals(run("data/sample-input.json").out(), result.out());
+    }
+
+    @Test
+    @DisplayName("Task 2 CLI (D-024): --new-ped with malformed unlockEvents is an input error that echoes the time")
+    void newPedRejectsMalformedUnlockEvents() throws IOException {
+        Path input = write("{\"calculationTime\": \"2026-10-27T12:00:00Z\", \"books\": [], \"unlockEvents\": \"tomorrow\"}");
+
+        assertFailure(run("--new-ped", input.toString()), Main.FAILED, "2026-10-27T12:00:00Z",
+                "unlockEvents must be an array of ISO-8601 UTC times ending in Z");
     }
 
     private Path write(String json) throws IOException {

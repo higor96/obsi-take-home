@@ -9,6 +9,7 @@ Requires Java 25; Maven comes from the wrapper (`./mvnw`).
 ```bash
 ./build.sh                       # runs the tests, builds target/obsi.jar
 ./run.sh data/sample-input.json  # baseline methodology
+./run.sh --new-ped data/new-ped.json  # Task 2 regime PED limit
 ```
 
 The sample publishes `100.23` with utilized depth `4`. It excludes Gamma, whose book is crossed, and Delta, whose PED is about 49.6%.
@@ -19,7 +20,7 @@ It prints exactly one JSON object, even for an unexpected exception:
 - **Input error or calculation failure:** stderr, exit 1.
 - **Usage error** (no path, two paths, unknown option): stderr, exit 2.
 
-`--new-ped` is reserved for Task 2 and currently fails with exit 2.
+`--new-ped` swaps the static 5% PED limit for the regime rule in `proposal.md`: 2% in an unlock window, 5% on UTC weekends, 3% otherwise.
 
 ## How the calculation runs
 
@@ -29,7 +30,7 @@ It prints exactly one JSON object, even for an unexpected exception:
 | --- | --- | --- |
 | Input contract | `input.SnapshotReader` | JSON to raw records; no methodology rules |
 | §2 screens | `BookScreen` | Drops bad entries; excludes unreadable, one-sided, crossed or locked books |
-| §2 PED | `DeviationScreen` | Median of valid mids; excludes PED above the limit |
+| §2 PED | `DeviationScreen` | Median of valid mids; excludes PED above the `PedLimitRule`'s limit |
 | §3 | `Consolidation` | Sums per price, sorts, uncrosses; `Crossed`/`Uncrossed` types keep crossed books out of §4 |
 | §4 Eq. 1a–1f | `PriceVolumeCurves` | Ask, bid and mid curves; mid-spread against D |
 | §5 Eq. 2 | `UtilizedDepth` | Largest v_i with midSV ≤ D and midSV(v_{i+1}) > D |
@@ -69,7 +70,7 @@ The §7 values live once in `Parameters` (PED limit 5, s = 1, D = 0.005, the 0.3
 
 - **Layout.** One test class per step, plus reader, output and in-process CLI tests.
 - **Sample checks.** The consolidated book, curves at v = 1..5, v_T = 4 and 100.23 match hand calculations.
-- **Tie fixture.** `src/test/resources/fixtures/eq3-constant-mid-tie.json` has a constant mid of 100.225 that must publish 100.23.
+- **Fixtures.** `eq3-constant-mid-tie.json` (a constant 100.225 mid must publish 100.23) and `data/new-ped.json` are checked against an independent Python calculation.
 - **Red first, then mutants.** Hand-run mutants, such as `>=` at the PED limit or HALF_EVEN rounding, were all caught except Eq. 2's "first instead of last crossing", which no valid input distinguishes (D-017).
 - **Independent review.** A fresh-context reviewer probed 57 edge inputs. Its fixes are D-015, D-017, D-019 and D-020.
 
@@ -79,7 +80,6 @@ The §7 values live once in `Parameters` (PED limit 5, s = 1, D = 0.005, the 0.3
 - **No audit trail.** Inputs, intermediate results and outputs are not stored, so a published value cannot be re-derived.
 - **Offline only.** One run per file, with no feed, scheduler, retries or staleness checks.
 - **Unbounded cost.** Files are read whole, Eq. 3 loops to v_T, and Eq. 2 scans a book that never crosses D in full.
-- **Parser limits.** Jackson's default limits on number length and nesting depth apply.
 - **No automation.** Mutation testing was manual (PIT would make it repeatable), and there is no CI.
 - **Accepted residual.** A value within the `double` error (about 1e-14) of a `.xx5` tie could round differently from exact arithmetic (D-007).
 
@@ -98,4 +98,4 @@ The §7 values live once in `Parameters` (PED limit 5, s = 1, D = 0.005, the 0.3
 
 ## Still to do
 
-Task 2: `proposal.md`, the `--new-ped` calculation, `data/new-ped.json`, and the AI transcript.
+`proposal.md` and the AI transcript.

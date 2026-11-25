@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
@@ -261,6 +262,68 @@ class SnapshotReaderTest {
         @DisplayName("Input contract (D-019): numbers needing exactly 1000 digits written out are read")
         void numbersOfExactlyOneThousandDigitsAreRead() {
             assertEquals(List.of(pair("1e999", "1e-999")), readBids("[1e999, 1e-999]"));
+        }
+    }
+
+    @Nested
+    class UnlockEvents {
+
+        private static final String INVALID = "unlockEvents must be an array of ISO-8601 UTC times ending in Z";
+
+        @Test
+        @DisplayName("Task 2 input (D-024): unlockEvents are read as instants, in input order, with the snapshot")
+        void readsUnlockStarts() throws IOException {
+            SnapshotWithUnlocks input = SnapshotReader.readWithUnlockEvents(Files.readString(Path.of("data/new-ped.json")));
+
+            assertEquals(List.of(Instant.parse("2026-09-28T08:00:00Z"), Instant.parse("2026-10-26T08:00:00Z")),
+                    input.unlockStarts());
+            assertEquals("2026-10-27T12:00:00Z", input.snapshot().calculationTime());
+            assertEquals(6, input.snapshot().books().size());
+        }
+
+        @ParameterizedTest(name = "input: {0}")
+        @ValueSource(strings = {
+                "{\"calculationTime\": \"2026-10-27T12:00:00Z\", \"books\": []}",
+                "{\"calculationTime\": \"2026-10-27T12:00:00Z\", \"books\": [], \"unlockEvents\": []}"})
+        @DisplayName("Task 2 input (D-024): absent or empty unlockEvents means no unlock")
+        void absentOrEmptyMeansNoUnlock(String json) {
+            assertEquals(List.of(), SnapshotReader.readWithUnlockEvents(json).unlockStarts());
+        }
+
+        @ParameterizedTest(name = "unlockEvents: {0}")
+        @ValueSource(strings = {
+                "\"2026-10-26T08:00:00Z\"",
+                "null",
+                "{}",
+                "[\"2026-10-26T08:00:00+00:00\"]",
+                "[\"2026-10-26\"]",
+                "[1761466800]",
+                "[null]",
+                "[\"2026-10-26T08:00:00Z\", \"soon\"]"})
+        @DisplayName("Task 2 input (D-024): unlockEvents that is not an array of ISO-8601 UTC times ending in Z is an input error that echoes the time")
+        void rejectsMalformedUnlockEvents(String value) {
+            InputError error = assertThrows(InputError.class, () -> SnapshotReader.readWithUnlockEvents(
+                    "{" + TIME + ", \"books\": [], \"unlockEvents\": " + value + "}"));
+
+            assertEquals(INVALID, error.getMessage());
+            assertEquals(Optional.of("2026-10-27T12:00:00Z"), error.calculationTime());
+        }
+
+        @Test
+        @DisplayName("Task 2 input (D-018, D-024): the baseline reader ignores unlockEvents, even malformed")
+        void baselineIgnoresUnlockEvents() {
+            Snapshot snapshot = SnapshotReader.read("{" + TIME + ", \"books\": [], \"unlockEvents\": 42}");
+
+            assertEquals("2026-10-27T12:00:00Z", snapshot.calculationTime());
+        }
+
+        @Test
+        @DisplayName("Task 2 input (D-024): a snapshot error is reported before an unlockEvents error")
+        void snapshotErrorsComeFirst() {
+            InputError error = assertThrows(InputError.class,
+                    () -> SnapshotReader.readWithUnlockEvents("{" + TIME + ", \"unlockEvents\": 42}"));
+
+            assertEquals("books is missing", error.getMessage());
         }
     }
 
