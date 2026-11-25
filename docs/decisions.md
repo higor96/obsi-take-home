@@ -31,9 +31,9 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
 ## D-003 A bad book is excluded without failing the snapshot
 
 - **Spec:** §2, "Exclude a book if its structure cannot be read" and "Apply these checks to each book before combining exchanges"; input contract, `books[].exchange` is a "Unique, nonempty exchange name"; output contract, `metadata.excludedExchanges`.
-- **Question:** What happens to a book that is not a JSON object, a book whose `exchange` is missing, empty or not a string, a book whose `bids` or `asks` is missing or not an array, and two books with the same name?
+- **Question:** What happens to a book that is not a JSON object, a book whose `exchange` is missing, empty, only whitespace or not a string, a book whose `bids` or `asks` is missing or not an array, and two books with the same name?
 - **Decision:** Each of these is excluded, and the rest of the snapshot is still calculated.
-  - **Not a JSON object, or `exchange` missing, empty or not a string** (`RawBook.Unnamed`): excluded and not listed in `excludedExchanges`, because it has no name to report.
+  - **Not a JSON object, or `exchange` missing, empty, only whitespace or not a string** (`RawBook.Unnamed`): excluded and not listed in `excludedExchanges`, because it has no name to report. Any other name is kept exactly as written; surrounding spaces are not trimmed.
   - **Valid name, but `bids` or `asks` missing or not an array** (`RawSide.Unreadable`): excluded and listed.
   - **Several books with the same name:** all of them are excluded, whatever their content, and the name is listed once, at its first position. Names are compared exactly as written.
 
@@ -42,7 +42,7 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
   - §2 screens each book on its own, so one bad book should not stop the others from being calculated.
   - The output lists exchange names, and a nameless book has none. The README records that such a drop is not visible in the output.
   - With duplicate names there is no way to tell which book is genuine, so neither is used.
-- **Tests:** `BookScreenTest`:
+- **Tests:** `RawBookTest`: "§2 a named book needs an exchange name that is neither empty nor only whitespace (D-003)" and "§2 an exchange name is kept exactly as written, surrounding spaces included (D-003)". `BookScreenTest`:
   - "§2 excludes a book with no usable exchange name (D-003)";
   - "§2 excludes a book whose bids cannot be read (D-003)" and "§2 excludes a book whose asks cannot be read (D-003)";
   - "§2 a book with no usable exchange name is excluded and not listed (D-003)";
