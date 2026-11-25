@@ -3,14 +3,62 @@ package io.github.higor96.obsi.method;
 import io.github.higor96.obsi.input.RawBook;
 import io.github.higor96.obsi.input.RawEntry;
 import io.github.higor96.obsi.input.RawSide;
+import java.math.BigDecimal;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /** §2 constituent order book screens. */
 final class BookScreen {
 
     private BookScreen() {
+    }
+
+    /**
+     * §2 screens for one snapshot: books sharing a name (D-003), then the structural screen, then
+     * the PED screen over the structurally valid books. Excluded names are listed once each, in
+     * input order; books with no usable name are not listed (D-003, D-011).
+     *
+     * @throws CalculationFailure if no book survives (§6, D-005)
+     */
+    static ScreeningResult screen(List<RawBook> rawBooks, BigDecimal pedLimitPercent) {
+        Set<String> sharedNames = namesUsedMoreThanOnce(rawBooks);
+        List<Book> structurallyValid = rawBooks.stream()
+                .filter(raw -> !(raw instanceof RawBook.Named named && sharedNames.contains(named.exchange())))
+                .map(BookScreen::screenBook)
+                .flatMap(Optional::stream)
+                .toList();
+        List<Book> constituents = DeviationScreen.screen(structurallyValid, pedLimitPercent);
+        if (constituents.isEmpty()) {
+            throw new CalculationFailure("no constituent book survived screening");
+        }
+
+        // Constituent names are unique, since books sharing a name never get this far.
+        Set<String> constituentNames = constituents.stream().map(Book::exchange).collect(Collectors.toSet());
+        List<String> excluded = rawBooks.stream()
+                .<String>mapMulti((raw, names) -> {
+                    if (raw instanceof RawBook.Named named) {
+                        names.accept(named.exchange());
+                    }
+                })
+                .filter(name -> !constituentNames.contains(name))
+                .distinct()
+                .toList();
+        return new ScreeningResult(constituents, excluded);
+    }
+
+    private static Set<String> namesUsedMoreThanOnce(List<RawBook> rawBooks) {
+        Set<String> seen = new HashSet<>();
+        Set<String> shared = new HashSet<>();
+        for (RawBook raw : rawBooks) {
+            if (raw instanceof RawBook.Named named && !seen.add(named.exchange())) {
+                shared.add(named.exchange());
+            }
+        }
+        return shared;
     }
 
     /**

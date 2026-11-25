@@ -42,7 +42,13 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
   - §2 screens each book on its own, so one bad book should not stop the others from being calculated.
   - The output lists exchange names, and a nameless book has none. The README records that such a drop is not visible in the output.
   - With duplicate names there is no way to tell which book is genuine, so neither is used.
-- **Tests:** `BookScreenTest`: "§2 excludes a book with no usable exchange name (D-003)", "§2 excludes a book whose bids cannot be read (D-003)" and "§2 excludes a book whose asks cannot be read (D-003)". Duplicate names: planned, §2 snapshot screen. JSON-to-`RawBook.Unnamed` and JSON-to-`RawSide.Unreadable` mappings: planned, input reader.
+- **Tests:** `BookScreenTest`:
+  - "§2 excludes a book with no usable exchange name (D-003)";
+  - "§2 excludes a book whose bids cannot be read (D-003)" and "§2 excludes a book whose asks cannot be read (D-003)";
+  - "§2 a book with no usable exchange name is excluded and not listed (D-003)";
+  - "§2 books sharing an exchange name are all excluded, listed once at the first position (D-003)".
+
+  JSON-to-`RawBook.Unnamed` and JSON-to-`RawSide.Unreadable` mappings: planned, input reader.
 
 ## D-004 `calculationTime` must end in `Z` and is echoed verbatim
 
@@ -58,7 +64,7 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
 - **Question:** Is `"books": []` an input error or a calculation failure?
 - **Decision:** Calculation failure, reported as no constituent book surviving screening, with `calculationTime` echoed.
 - **Why:** `[]` is a well-formed array, so the top-level input conforms. There are just no books to survive.
-- **Tests:** Planned, §2 screens.
+- **Tests:** `BookScreenTest`: "§6 an empty books array fails as no book surviving screening (D-005)".
 
 ## D-006 Jackson parses the input, with numbers read straight into `BigDecimal`
 
@@ -122,15 +128,18 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
 - **Question:** Does the list include books excluded for structure, for PED, or both?
 - **Decision:** Both, in input order, each exchange once.
 - **Why:** §2, "Constituent order book screens", covers both checks. The sample input excludes Gamma (crossed book) and Delta (PED).
-- **Tests:** Planned, §2 screens and the end-to-end sample test.
+- **Tests:** `BookScreenTest`: "§2 sample snapshot: Gamma (crossed) and Delta (PED) are excluded, in input order (D-011)" and "§2 excluded exchanges keep input order across the structural and PED screens (D-011)". End-to-end sample test: planned, CLI.
 
 ## D-012 The PED limit is compared exactly
 
-- **Spec:** §2 PED equation; "Exclude a book only if \(\mathrm{PED}_{T,e}>5\%\). A book at exactly 5% passes."
-- **Question:** PED is a division that may not terminate. How is the 5% boundary evaluated?
-- **Decision:** Exclude a book if and only if \(20\,|m_{T,e}-\widetilde m_T| > \widetilde m_T\). This is the PED inequality multiplied through by \(\widetilde m_T/5\), which is positive because all prices are strictly positive. There is no division and no rounding.
-- **Why:** Rounding a computed PED could put a book at exactly 5% on the wrong side of the limit.
-- **Tests:** Planned, §2 PED ("exactly 5% passes", "just above 5% is excluded").
+- **Spec:** §2 PED equation; "Exclude a book only if \(\mathrm{PED}_{T,e}>5\%\). A book at exactly 5% passes."; §7, orderbook percentage deviation limit.
+- **Question:** PED is a division that may not terminate. How is the limit evaluated?
+- **Decision:** Exclude a book if and only if \(100\,|m_{T,e}-\widetilde m_T| > L\,\widetilde m_T\), where \(L\) is the PED limit in percent. This is the PED inequality multiplied through by \(\widetilde m_T\), which is positive because all prices are strictly positive. There is no division and no rounding. \(L\) is a parameter of `DeviationScreen.screen(books, limitPercent)`. The §7 value of 5 is defined once, in `Parameters.PED_LIMIT_PERCENT`.
+- **Why:** Rounding a computed PED could put a book exactly at the limit on the wrong side. Keeping \(L\) explicit makes the comparison read like the spec, instead of folding 100/5 into a constant 20. It also lets the limit change, for example for Task 2, without touching the comparison.
+- **Tests:** `DeviationScreenTest`:
+  - "§2 a book exactly at the PED limit passes, above and below the median (D-012)";
+  - "§2 a book just above the PED limit is excluded, above and below the median (D-012)";
+  - "§2 the PED limit is a parameter: a 3% deviation passes at 5% and is excluded at 2% (D-012)".
 
 ## D-013 The mid-spread cutoff is compared exactly
 

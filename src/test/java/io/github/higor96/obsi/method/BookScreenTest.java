@@ -1,9 +1,18 @@
 package io.github.higor96.obsi.method;
 
+import static io.github.higor96.obsi.method.TestData.crossedRawBook;
 import static io.github.higor96.obsi.method.TestData.level;
+import static io.github.higor96.obsi.method.TestData.names;
 import static io.github.higor96.obsi.method.TestData.pair;
 import static io.github.higor96.obsi.method.TestData.rawBook;
+import static io.github.higor96.obsi.method.TestData.rawBookWithMid;
+import static io.github.higor96.obsi.method.TestData.sampleAlpha;
+import static io.github.higor96.obsi.method.TestData.sampleBeta;
+import static io.github.higor96.obsi.method.TestData.sampleBooks;
+import static io.github.higor96.obsi.method.TestData.sampleDelta;
+import static io.github.higor96.obsi.method.TestData.sampleGamma;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.higor96.obsi.input.RawBook;
@@ -178,6 +187,105 @@ class BookScreenTest {
 
             assertTrue(book.isPresent(), "the 101 bid has size 0, so the book is not crossed");
             assertEquals(new BigDecimal("99"), book.get().bestBid());
+        }
+    }
+
+    @Nested
+    class SnapshotScreen {
+
+        @Test
+        @DisplayName("§2 sample snapshot: Gamma (crossed) and Delta (PED) are excluded, in input order (D-011)")
+        void sampleSnapshot() {
+            ScreeningResult result = BookScreen.screen(sampleBooks(), Parameters.PED_LIMIT_PERCENT);
+
+            assertEquals(List.of("Alpha", "Beta"), names(result.constituents()));
+            assertEquals(List.of("Gamma", "Delta"), result.excludedExchanges());
+        }
+
+        @Test
+        @DisplayName("§2 excluded exchanges keep input order across the structural and PED screens (D-011)")
+        void exclusionsKeepInputOrder() {
+            List<RawBook> books = List.of(sampleDelta(), sampleAlpha(), sampleBeta(), sampleGamma());
+
+            ScreeningResult result = BookScreen.screen(books, Parameters.PED_LIMIT_PERCENT);
+
+            assertEquals(List.of("Delta", "Gamma"), result.excludedExchanges());
+        }
+
+        @Test
+        @DisplayName("§2 the PED median uses only books that pass the structural screen")
+        void medianUsesOnlyStructurallyValidBooks() {
+            // Valid mids 100, 100, 105.1 give a median of 100, so D (5.1%) is excluded.
+            // Counting C's crossed mid of 199.5 would move the median to 102.55 and let D pass.
+            List<RawBook> books = List.of(
+                    rawBookWithMid("A", "100"),
+                    rawBookWithMid("B", "100"),
+                    crossedRawBook("C"),
+                    rawBookWithMid("D", "105.1"));
+
+            ScreeningResult result = BookScreen.screen(books, Parameters.PED_LIMIT_PERCENT);
+
+            assertEquals(List.of("A", "B"), names(result.constituents()));
+            assertEquals(List.of("C", "D"), result.excludedExchanges());
+        }
+
+        @Test
+        @DisplayName("§2 a book with no usable exchange name is excluded and not listed (D-003)")
+        void unnamedBookIsExcludedAndNotListed() {
+            List<RawBook> books = List.of(new RawBook.Unnamed(), rawBookWithMid("A", "100"), rawBookWithMid("B", "100.1"));
+
+            ScreeningResult result = BookScreen.screen(books, Parameters.PED_LIMIT_PERCENT);
+
+            assertEquals(List.of("A", "B"), names(result.constituents()));
+            assertEquals(List.of(), result.excludedExchanges());
+        }
+
+        @Test
+        @DisplayName("§2 books sharing an exchange name are all excluded, listed once at the first position (D-003)")
+        void duplicateNamesAreAllExcluded() {
+            List<RawBook> books = List.of(
+                    rawBookWithMid("Alpha", "100"),
+                    crossedRawBook("Delta"),
+                    rawBookWithMid("Alpha", "101"),
+                    rawBookWithMid("Beta", "100"),
+                    rawBookWithMid("Gamma", "100.5"));
+
+            ScreeningResult result = BookScreen.screen(books, Parameters.PED_LIMIT_PERCENT);
+
+            assertEquals(List.of("Beta", "Gamma"), names(result.constituents()));
+            assertEquals(List.of("Alpha", "Delta"), result.excludedExchanges());
+        }
+
+        @Test
+        @DisplayName("§6 the calculation fails when no book passes the structural screen")
+        void failsWhenNoBookIsStructurallyValid() {
+            List<RawBook> books = List.of(sampleGamma(), new RawBook.Unnamed());
+
+            CalculationFailure failure = assertThrows(CalculationFailure.class,
+                    () -> BookScreen.screen(books, Parameters.PED_LIMIT_PERCENT));
+
+            assertEquals("no constituent book survived screening", failure.getMessage());
+        }
+
+        @Test
+        @DisplayName("§6 the calculation fails when the PED screen excludes every book")
+        void failsWhenPedExcludesEveryBook() {
+            // Two books: the median is 150, and both deviate by 33%.
+            List<RawBook> books = List.of(rawBookWithMid("A", "100"), rawBookWithMid("B", "200"));
+
+            CalculationFailure failure = assertThrows(CalculationFailure.class,
+                    () -> BookScreen.screen(books, Parameters.PED_LIMIT_PERCENT));
+
+            assertEquals("no constituent book survived screening", failure.getMessage());
+        }
+
+        @Test
+        @DisplayName("§6 an empty books array fails as no book surviving screening (D-005)")
+        void emptyBooksFails() {
+            CalculationFailure failure = assertThrows(CalculationFailure.class,
+                    () -> BookScreen.screen(List.of(), Parameters.PED_LIMIT_PERCENT));
+
+            assertEquals("no constituent book survived screening", failure.getMessage());
         }
     }
 }
