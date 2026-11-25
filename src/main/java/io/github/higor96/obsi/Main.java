@@ -6,6 +6,7 @@ import io.github.higor96.obsi.input.SnapshotReader;
 import io.github.higor96.obsi.method.CalculationFailure;
 import io.github.higor96.obsi.method.ObsiCalculator;
 import io.github.higor96.obsi.method.Publication;
+import io.github.higor96.obsi.method.StaticPedLimit;
 import io.github.higor96.obsi.output.ResultJson;
 import java.io.FileDescriptor;
 import java.io.FileOutputStream;
@@ -88,7 +89,7 @@ public final class Main {
         }
 
         try {
-            Publication publication = ObsiCalculator.calculate(snapshot);
+            Publication publication = ObsiCalculator.calculate(snapshot, StaticPedLimit.baseline());
             out.print(ResultJson.published(snapshot.calculationTime(), publication) + "\n");
             return PUBLISHED;
         } catch (CalculationFailure e) {

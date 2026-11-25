@@ -217,3 +217,55 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
 - **Decision:** No. The reader drops one leading U+FEFF before parsing.
 - **Why:** RFC 8259 lets a JSON parser ignore a leading BOM. Some editors and exporters add one, and it says nothing about the data.
 - **Tests:** `SnapshotReaderTest`: "Input contract (D-020): a leading UTF-8 byte order mark is ignored".
+
+## D-021 The PED limit comes from a pluggable rule
+
+- **Spec:** §2, "Exclude a book only if \(\mathrm{PED}_{T,e}>5\%\)"; assessment PDF, Task 2, "Implement the new proposal in the same CLI as a new flag".
+- **Question:** The baseline fixes the limit at 5%. Task 2 needs a second rule, selected by `--new-ped`, with the rest of the methodology unchanged. Where does the choice live?
+- **Decision:** A `PedLimitRule` interface gives the limit, in percent, for a snapshot's calculation time. `StaticPedLimit` is the baseline: 5% at any time. `ObsiCalculator.calculate(snapshot, rule)` asks the rule once and passes the limit to the unchanged §2 screen (D-012). The CLI picks the rule.
+- **Why:** Only the limit differs between the two methodologies. One seam keeps the baseline untouched and gives each rule its own tests.
+- **Tests:** `StaticPedLimitTest`; `ObsiCalculatorTest`.
+
+## D-022 Task 2: the weekend is the UTC calendar weekend
+
+- **Spec:** Assessment PDF, Notes from the Product Manager Meeting (lower weekend liquidity); input contract, `calculationTime` is UTC.
+- **Question:** Which calculation times count as the weekend?
+- **Decision:** From Saturday 00:00:00Z inclusive to Monday 00:00:00Z exclusive, by `calculationTime`. Every other time is a weekday.
+- **Why:** It is the simplest rule to state to clients and needs no time zone beyond the input's own UTC. A Friday-evening start, as some markets use, is a calibration question for later.
+- **Tests:** Planned, regime rule.
+
+## D-023 Task 2: unlock outranks weekend, which outranks weekday
+
+- **Spec:** Assessment PDF, Notes from the Product Manager Meeting: unlocks should make PED "much tighter"; weekend liquidity is lower.
+- **Question:** A calculation time can fall in an unlock window and on a weekend. Which limit applies?
+- **Decision:** The unlock limit whenever an unlock window contains the time, otherwise the weekend limit on a weekend, otherwise the weekday limit.
+- **Why:** An unlock materially raises liquidity whatever the day, and the PM asked for the tightest limit then.
+- **Tests:** Planned, regime rule.
+
+## D-024 Task 2: unlock events are an optional list of start times
+
+- **Spec:** Assessment PDF, Task 2 item 3, new input fields are documented in `proposal.md` with a sample in `data/new-ped.json`; PM notes, unlocks are announced in advance and liquidity reverts about 48 hours after the start.
+- **Question:** How does the input say when unlocks happen?
+- **Decision:** An optional top-level `unlockEvents`: an array of ISO-8601 UTC start times that end in `Z`, read like `calculationTime` (D-004).
+  - Each start opens the window `[start, start + 48h)`. A start after `calculationTime` does not apply yet. Several events may be listed.
+  - Absent or empty means no unlock.
+  - Under `--new-ped`, a field that is not an array of such strings is an input error, because a bad schedule must not silently change the limit.
+  - The baseline ignores the field (D-018).
+- **Why:** Start times are what is announced, so the input carries exactly that. The calculator stays stateless: each snapshot carries the schedule it needs.
+- **Tests:** Planned, regime rule and reader.
+
+## D-025 Task 2: regime limits are named estimates awaiting calibration
+
+- **Spec:** Assessment PDF, PM notes: the static limit is too wide on weekdays; unlocks need much tighter PED.
+- **Question:** What limit does each regime use?
+- **Decision:** Weekday 3%, weekend 5% (the baseline value), unlock 2%, unlock window 48 hours. They are named constants in one place, like the §7 values, and are marked as estimates.
+- **Why:** They express the PM's direction: weekdays tighter than weekends, and unlocks tightest. Calibrating them needs historical PED by regime and a record of known exchange incidents, which `proposal.md` lists as data needs.
+- **Tests:** Planned, regime rule.
+
+## D-026 Task 2: the output shape does not change
+
+- **Spec:** Assessment PDF, success and failure output shapes; Task 2 asks for input changes to be documented, not output changes.
+- **Question:** Should the `--new-ped` output say which regime and limit applied?
+- **Decision:** No. `--new-ped` prints the same two shapes as the baseline.
+- **Why:** Existing consumers keep working. Showing the regime would help transparency, so `proposal.md` lists it as a production gap.
+- **Tests:** Planned, CLI.
