@@ -18,7 +18,7 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
 - **Question:** Is an entry that is not a two-element array (`[100]`, `[100, 1, 7]`, `null`, an object) a bad entry or an unreadable book?
 - **Decision:** Discard the entry. "Structure cannot be read" applies only to the book object and its `bids`/`asks` arrays (see D-003).
 - **Why:** The entry rule is the narrower one and keeps the rest of a usable book. A book that loses every entry on one side is still excluded by the empty-side rule.
-- **Tests:** Planned, §2 entry screen.
+- **Tests:** `BookScreenTest`: "§2 discards an entry that is not a [price, size] pair (D-001)" and "§2 discarding an entry keeps the rest of the side, in input order (D-001)". JSON-to-`RawEntry.NotAPair` mapping: planned, input reader.
 
 ## D-002 Only JSON numbers are numeric
 
@@ -26,7 +26,7 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
 - **Question:** Does a numeric string such as `"100.5"` count as numeric?
 - **Decision:** No. A string, boolean or `null` component makes the entry non-numeric, so the entry is discarded.
 - **Why:** The input contract types price and size as JSON numbers. Coercing strings would accept input the contract does not allow.
-- **Tests:** Planned, §2 entry screen.
+- **Tests:** `BookScreenTest`: "§2 discards an entry whose price or size is not a JSON number (D-002)". JSON-type-to-empty-component mapping: planned, input reader.
 
 ## D-003 Exchange name problems fail the snapshot; unreadable sides exclude the book
 
