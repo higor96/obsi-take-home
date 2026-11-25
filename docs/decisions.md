@@ -145,9 +145,9 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
 
 - **Spec:** Eq. 1f and Eq. 2, \(\operatorname{midSV}_T(v)\leq D\).
 - **Question:** \(\operatorname{midSV}\) is a division that may not terminate. How is the cutoff evaluated?
-- **Decision:** \(\operatorname{midSV}_T(v)\leq D\) if and only if \(\operatorname{askPV}_T(v)\leq(1+D)\operatorname{midPV}_T(v)\), that is \(\operatorname{askPV}\leq1.005\,\operatorname{midPV}\). This is valid because \(\operatorname{midPV}>0\). There is no division.
+- **Decision:** \(\operatorname{midSV}_T(v)\leq D\) if and only if \(\operatorname{askPV}_T(v)\leq(1+D)\operatorname{midPV}_T(v)\). This is valid because \(\operatorname{midPV}>0\). There is no division. \(D\) is a parameter of `PriceVolumeCurves.midSpreadAtMost(v, cutoff)`, and the §7 value of 0.005 is defined once, in `Parameters.MID_SPREAD_CUTOFF`. This follows the PED limit (D-012), and the spacing \(s\) is handled the same way (`Parameters.SPACING`).
 - **Why:** As in D-012, a value exactly at \(D\) must count as at or below \(D\).
-- **Tests:** Planned, Eq. 2 ("midSV exactly D counts as at or below D").
+- **Tests:** `PriceVolumeCurvesTest`: "Eq. 1f midSV exactly at the cutoff counts as within it; just above does not (D-013)". Eq. 2 at the boundary: planned, utilized depth.
 
 ## D-014 Eq. 3 is accumulated exactly and divided once
 
