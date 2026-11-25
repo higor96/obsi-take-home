@@ -20,18 +20,26 @@ final class Consolidation {
      * lowest to highest.
      */
     static ConsolidatedBook consolidate(List<Book> books) {
-        return new ConsolidatedBook(
+        return ConsolidatedBook.of(
                 sumByPrice(books.stream().flatMap(book -> book.bids().stream()), Comparator.reverseOrder()),
                 sumByPrice(books.stream().flatMap(book -> book.asks().stream()), Comparator.naturalOrder()));
     }
 
     /**
-     * §3 uncrossing: while the best bid is greater than or equal to the best ask, subtracts the
-     * smaller of their sizes from both levels and removes any level left at zero.
+     * §3 uncrossing. An uncrossed book is returned as is. For a crossed one, while the best bid
+     * is greater than or equal to the best ask, subtracts the smaller of their sizes from both
+     * levels and removes any level left at zero.
      *
      * @throws CalculationFailure if either side is exhausted (§3, §6)
      */
-    static ConsolidatedBook uncross(ConsolidatedBook book) {
+    static ConsolidatedBook.Uncrossed uncross(ConsolidatedBook book) {
+        return switch (book) {
+            case ConsolidatedBook.Uncrossed uncrossed -> uncrossed;
+            case ConsolidatedBook.Crossed crossed -> matchUntilUncrossed(crossed);
+        };
+    }
+
+    private static ConsolidatedBook.Uncrossed matchUntilUncrossed(ConsolidatedBook.Crossed book) {
         Deque<Level> bids = new ArrayDeque<>(book.bids());
         Deque<Level> asks = new ArrayDeque<>(book.asks());
         while (!bids.isEmpty() && !asks.isEmpty()
@@ -53,7 +61,7 @@ final class Consolidation {
                     ? "uncrossing exhausted both sides"
                     : "uncrossing exhausted the " + (bids.isEmpty() ? "bid" : "ask") + " side");
         }
-        return new ConsolidatedBook(List.copyOf(bids), List.copyOf(asks));
+        return new ConsolidatedBook.Uncrossed(List.copyOf(bids), List.copyOf(asks));
     }
 
     /**

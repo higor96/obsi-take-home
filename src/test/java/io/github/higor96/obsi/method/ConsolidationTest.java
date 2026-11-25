@@ -5,12 +5,33 @@ import static io.github.higor96.obsi.method.TestData.describe;
 import static io.github.higor96.obsi.method.TestData.level;
 import static io.github.higor96.obsi.method.TestData.sampleBooks;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class ConsolidationTest {
+
+    @Test
+    @DisplayName("§3 a consolidated book whose best bid is at or above its best ask is crossed")
+    void bookWithBestBidAtOrAboveBestAskIsCrossed() {
+        Book a = book("A", List.of(level("101", "1")), List.of(level("102", "1")));
+        Book b = book("B", List.of(level("99", "1")), List.of(level("100", "1")));
+        Book locked = book("C", List.of(level("100.5", "2")), List.of(level("103", "1")));
+        Book lockedAgainst = book("D", List.of(level("99", "1")), List.of(level("100.5", "1")));
+
+        assertInstanceOf(ConsolidatedBook.Crossed.class, Consolidation.consolidate(List.of(a, b)));
+        assertInstanceOf(ConsolidatedBook.Crossed.class, Consolidation.consolidate(List.of(locked, lockedAgainst)));
+    }
+
+    @Test
+    @DisplayName("§3 a consolidated book whose best bid is below its best ask is uncrossed (sample snapshot)")
+    void bookWithBestBidBelowBestAskIsUncrossed() {
+        List<Book> constituents = BookScreen.screen(sampleBooks(), Parameters.PED_LIMIT_PERCENT).constituents();
+
+        assertInstanceOf(ConsolidatedBook.Uncrossed.class, Consolidation.consolidate(constituents));
+    }
 
     @Test
     @DisplayName("§3 consolidation sums sizes at identical prices across books")
