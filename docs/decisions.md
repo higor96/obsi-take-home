@@ -147,7 +147,7 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
 - **Question:** \(\operatorname{midSV}\) is a division that may not terminate. How is the cutoff evaluated?
 - **Decision:** \(\operatorname{midSV}_T(v)\leq D\) if and only if \(\operatorname{askPV}_T(v)\leq(1+D)\operatorname{midPV}_T(v)\). This is valid because \(\operatorname{midPV}>0\). There is no division. \(D\) is a parameter of `PriceVolumeCurves.midSpreadAtMost(v, cutoff)`, and the §7 value of 0.005 is defined once, in `Parameters.MID_SPREAD_CUTOFF`. This follows the PED limit (D-012), and the spacing \(s\) is handled the same way (`Parameters.SPACING`).
 - **Why:** As in D-012, a value exactly at \(D\) must count as at or below \(D\).
-- **Tests:** `PriceVolumeCurvesTest`: "Eq. 1f midSV exactly at the cutoff counts as within it; just above does not (D-013)". Eq. 2 at the boundary: planned, utilized depth.
+- **Tests:** `PriceVolumeCurvesTest`: "Eq. 1f midSV exactly at the cutoff counts as within it; just above does not (D-013)". `UtilizedDepthTest`: "Eq. 2 midSV exactly at D counts as at or below D (D-013)".
 
 ## D-014 Eq. 3 is accumulated exactly and divided once
 
@@ -172,3 +172,11 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
 - **Decision:** `value` is written with `setScale(2, RoundingMode.HALF_UP).toPlainString()`. `utilizedDepth` is written with `toPlainString()` and no trailing zeros (`"4"`, never `"4.0"` or `"4E+0"`). The JSON is pretty-printed with two-space indentation and fields in the PDF's order.
 - **Why:** This matches the PDF examples, and `toPlainString()` never uses scientific notation.
 - **Tests:** Planned, CLI and the end-to-end sample test.
+
+## D-017 Eq. 2 is evaluated as written, although its set has at most one element
+
+- **Spec:** Eq. 1a–1f and Eq. 2, \(v_T=\max\{v_i:\operatorname{midSV}_T(v_i)\leq D\land\operatorname{midSV}_T(v_{i+1})>D\}\); §6, the calculation fails when that set is empty.
+- **Question:** For an uncrossed book, \(\operatorname{askPV}_T\) never falls and \(\operatorname{bidPV}_T\) never rises as \(v\) grows. \(\operatorname{midSV}_T=(\operatorname{askPV}_T-\operatorname{bidPV}_T)/(\operatorname{askPV}_T+\operatorname{bidPV}_T)\) rises with the ask and falls with the bid, so it never decreases in \(v\). The set in Eq. 2 therefore holds at most one volume. Should the code stop at the first crossing?
+- **Decision:** No. `UtilizedDepth.of` scans every candidate whose \(v_i\) and \(v_{i+1}\) are both defined and keeps the largest crossing, as Eq. 2 is written. It stops at the first undefined \(v_{i+1}\), because the curves are defined on \((0,\text{total size of the shallower side}]\). The empty set fails with one of two reasons: "insufficient depth" when the curves do not reach \(2s\), and "no mid-spread cutoff crossing" otherwise.
+- **Why:** Reading the code against Eq. 2 needs no extra argument, and the scan costs the same order as the Eq. 3 sum. A consequence for testing: a mutant that keeps the first crossing instead of the last passes every test, and no valid input can tell the two apart.
+- **Tests:** `UtilizedDepthTest`.

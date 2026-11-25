@@ -90,4 +90,10 @@ final class TestData {
     static Book book(String exchange, List<Level> bids, List<Level> asks) {
         return new Book(exchange, bids, asks);
     }
+
+    /** The sample snapshot taken through §2 and §3: the uncrossed book the §4 curves are built from. */
+    static ConsolidatedBook.Uncrossed sampleUncrossedBook() {
+        List<Book> constituents = BookScreen.screen(sampleBooks(), Parameters.PED_LIMIT_PERCENT).constituents();
+        return Consolidation.uncross(Consolidation.consolidate(constituents));
+    }
 }

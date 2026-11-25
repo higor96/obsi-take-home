@@ -23,6 +23,11 @@ final class PriceVolumeCurves {
         this.spacing = spacing;
     }
 
+    /** The spacing s; Eq. 2 and Eq. 3 sample the curves at its multiples. */
+    BigDecimal spacing() {
+        return spacing;
+    }
+
     /** Eq. 1c: askPV(v), the unspaced ask curve (Eq. 1a) at s·⌈v/s⌉. Empty where it is undefined. */
     Optional<BigDecimal> askPV(BigDecimal v) {
         return asks.priceReachedBy(spaced(v));
