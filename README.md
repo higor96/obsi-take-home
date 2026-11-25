@@ -78,7 +78,7 @@ The §7 values live once in `Parameters` (PED limit 5, s = 1, D = 0.005, the 0.3
 
 - **Silent drops.** Nameless books and exclusion reasons are not reported; this needs a diagnostics channel.
 - **No audit trail.** Inputs, intermediate results and outputs are not stored, so a published value cannot be re-derived.
-- **Offline only.** One run per file, with no feed, scheduler, retries or staleness checks.
+- **Offline only.** One run per file; no feed, scheduler or staleness checks.
 - **Unbounded cost.** Files are read whole, Eq. 3 loops to v_T, and Eq. 2 scans a book that never crosses D in full.
 - **No automation.** Mutation testing was manual (PIT would make it repeatable), and there is no CI.
 - **Accepted residual.** A value within the `double` error (about 1e-14) of a `.xx5` tie could round differently from exact arithmetic (D-007).
@@ -92,7 +92,7 @@ The §7 values live once in `Parameters` (PED limit 5, s = 1, D = 0.005, the 0.3
 
 ## Layout
 
-- **`docs/`:** the spec, the brief, `decisions.md`, and CME CF background in `reference/`.
+- **`docs/decisions.md`:** every interpretation; the brief and spec are not published here.
 - **`proposal.md`:** the Task 2 PED proposal; **`tools/`:** the Python oracle.
 - **`ai-transcript.md`:** the AI sessions; reviewer subagents in `ai-transcripts/`.
 - **`data/`:** input files.

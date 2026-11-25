@@ -1,4 +1,5 @@
-"""Independent OBSI calculation, written straight from docs/obsi-methodology.md.
+"""Independent OBSI calculation, written straight from the exercise's methodology spec
+(docs/obsi-methodology.md, which is not published with this repository).
 
 A cross-check for the Java code, not part of the build. It uses Python's decimal module at 60
 digits, scans Eq. 2 in full as written, and computes e^(-λv) with Decimal.exp.

@@ -4,6 +4,8 @@ Order Book Snapshot Index (OBSI) take-home. One Java 25 command-line program tha
 
 ## Sources of truth
 
+These three documents came with the assessment. They stay on this machine only: they are git-ignored and never published.
+
 - `docs/obsi-methodology.md` is the calculation spec. Implement exactly what it says, nothing more.
 - `docs/take-home-assessment.pdf` defines the input contract, the success and failure output shapes, the CLI and the deliverables.
 - `docs/reference/cme-cf-real-time-indices-methodology.pdf` is background only. Do not bring in rules from it (order size caps, reentry state, half-limit tests, dynamic deviation limits and so on). The exercise spec deliberately differs from it, and where they disagree the exercise spec wins.

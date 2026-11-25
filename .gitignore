@@ -12,5 +12,10 @@ target/
 # OS
 .DS_Store
 
+# Assessment documents: kept locally, never published
+docs/take-home-assessment.pdf
+docs/obsi-methodology.md
+docs/reference/
+
 # Scratch notebooks
 .ipynb_checkpoints/

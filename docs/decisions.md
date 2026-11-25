@@ -1,6 +1,6 @@
 # Decisions
 
-Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each entry cites the section or equation it interprets.
+Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each entry cites the section or equation it interprets. The spec and the assessment PDF came with the assessment and are not published with this repository, so entries cite them by section and quote them only briefly.
 
 <!--
 ## D-NNN Short title
