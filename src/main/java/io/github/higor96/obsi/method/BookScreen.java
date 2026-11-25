@@ -1,5 +1,6 @@
 package io.github.higor96.obsi.method;
 
+import io.github.higor96.obsi.input.RawBook;
 import io.github.higor96.obsi.input.RawEntry;
 import java.math.BigDecimal;
 import java.util.List;
@@ -26,6 +27,27 @@ final class BookScreen {
                     case RawEntry.NotAPair _ -> Stream.<Level>empty();
                 })
                 .toList();
+    }
+
+    /**
+     * §2 structural screen. A book is excluded (empty result) if its structure cannot be read
+     * (D-003), if either side is empty after the entry screen, or if its best bid is greater than
+     * or equal to its best ask.
+     */
+    static Optional<Book> screenBook(RawBook raw) {
+        if (raw.bids().isEmpty() || raw.asks().isEmpty()) {
+            return Optional.empty();
+        }
+        List<Level> bids = screenEntries(raw.bids().get());
+        List<Level> asks = screenEntries(raw.asks().get());
+        if (bids.isEmpty() || asks.isEmpty()) {
+            return Optional.empty();
+        }
+        Book book = new Book(raw.exchange(), bids, asks);
+        if (book.bestBid().compareTo(book.bestAsk()) >= 0) {
+            return Optional.empty();
+        }
+        return Optional.of(book);
     }
 
     private static boolean isStrictlyPositive(Optional<BigDecimal> number) {

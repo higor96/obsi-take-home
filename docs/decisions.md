@@ -34,7 +34,7 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
 - **Question:** What happens to a book that is not a JSON object, a book whose `exchange` is missing, empty or not a string, or two books with the same name?
 - **Decision:** Input error for the whole snapshot. A book with a valid name whose `bids` or `asks` is missing or not an array is excluded and listed in `excludedExchanges`.
 - **Why:** The contract requires unique, nonempty names, and every excluded book must be reported by name. A book without a usable name cannot be reported, and duplicate names make the report ambiguous.
-- **Tests:** Planned, input reader and §2 book screen.
+- **Tests:** `BookScreenTest`: "§2 excludes a book whose bids cannot be read (D-003)" and "§2 excludes a book whose asks cannot be read (D-003)". Name checks and the JSON-to-empty-side mapping: planned, input reader.
 
 ## D-004 `calculationTime` must end in `Z` and is echoed verbatim
 
@@ -91,7 +91,7 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
 - **Question:** Are the best bid and best ask the first entries listed, or the extreme prices?
 - **Decision:** After entry screening, the best bid is the highest bid price and the best ask is the lowest ask price, whatever the input order.
 - **Why:** The input contract does not promise sorted levels.
-- **Tests:** Planned, §2 book screen.
+- **Tests:** `BookTest`: "§2 best bid is the highest bid price and best ask the lowest ask price, whatever the input order (D-009)". `BookScreenTest`: "§2 the crossed-book check uses the best prices, not the first entries listed (D-009)".
 
 ## D-010 Identical prices are compared by value
 
