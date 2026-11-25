@@ -12,6 +12,15 @@ Requires Java 25. Maven is provided by the wrapper (`./mvnw`).
 ./run.sh --new-ped data/new-ped.json
 ```
 
+## Dependencies
+
+| Library | Scope | Why |
+| --- | --- | --- |
+| Jackson databind 2.22 | runtime | Parses the input JSON. Configured so every number goes straight from the JSON text to an exact `BigDecimal`, never through `double` (D-006). Well known and well tested; a hand-written parser would be more code to test. |
+| JUnit Jupiter 6 | test | Unit and end-to-end tests. |
+
+`maven-shade-plugin` bundles Jackson into `target/obsi.jar`, so `./run.sh` needs only Java 25.
+
 ## Layout
 
 | Path | Contents |
