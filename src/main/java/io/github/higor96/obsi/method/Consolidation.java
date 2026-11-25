@@ -1,7 +1,9 @@
 package io.github.higor96.obsi.method;
 
 import java.math.BigDecimal;
+import java.util.ArrayDeque;
 import java.util.Comparator;
+import java.util.Deque;
 import java.util.List;
 import java.util.TreeMap;
 import java.util.stream.Stream;
@@ -21,6 +23,37 @@ final class Consolidation {
         return new ConsolidatedBook(
                 sumByPrice(books.stream().flatMap(book -> book.bids().stream()), Comparator.reverseOrder()),
                 sumByPrice(books.stream().flatMap(book -> book.asks().stream()), Comparator.naturalOrder()));
+    }
+
+    /**
+     * §3 uncrossing: while the best bid is greater than or equal to the best ask, subtracts the
+     * smaller of their sizes from both levels and removes any level left at zero.
+     *
+     * @throws CalculationFailure if either side is exhausted (§3, §6)
+     */
+    static ConsolidatedBook uncross(ConsolidatedBook book) {
+        Deque<Level> bids = new ArrayDeque<>(book.bids());
+        Deque<Level> asks = new ArrayDeque<>(book.asks());
+        while (!bids.isEmpty() && !asks.isEmpty()
+                && bids.peekFirst().price().compareTo(asks.peekFirst().price()) >= 0) {
+            Level bestBid = bids.removeFirst();
+            Level bestAsk = asks.removeFirst();
+            BigDecimal matched = bestBid.size().min(bestAsk.size());
+            BigDecimal bidResidual = bestBid.size().subtract(matched);
+            BigDecimal askResidual = bestAsk.size().subtract(matched);
+            if (bidResidual.signum() > 0) {
+                bids.addFirst(new Level(bestBid.price(), bidResidual));
+            }
+            if (askResidual.signum() > 0) {
+                asks.addFirst(new Level(bestAsk.price(), askResidual));
+            }
+        }
+        if (bids.isEmpty() || asks.isEmpty()) {
+            throw new CalculationFailure(bids.isEmpty() && asks.isEmpty()
+                    ? "uncrossing exhausted both sides"
+                    : "uncrossing exhausted the " + (bids.isEmpty() ? "bid" : "ask") + " side");
+        }
+        return new ConsolidatedBook(List.copyOf(bids), List.copyOf(asks));
     }
 
     /**
