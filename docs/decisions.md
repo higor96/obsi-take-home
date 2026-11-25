@@ -118,9 +118,9 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
 
 - **Spec:** §3, "Sum sizes at identical bid prices and, separately, at identical ask prices".
 - **Question:** Are `99.8` and `99.80` identical prices?
-- **Decision:** Yes. Prices are compared numerically (`compareTo`), so they form one level. `BigDecimal.equals` would treat them as different.
+- **Decision:** Yes. Prices are compared numerically (`compareTo`), so they form one level. `BigDecimal.equals` would treat them as different. The consolidated level keeps the first spelling seen.
 - **Why:** They are the same price. Trailing zeros in the JSON text carry no meaning.
-- **Tests:** Planned, §3 consolidation.
+- **Tests:** `ConsolidationTest`: "§3 identical prices are matched by value: 99.8 and 99.80 form one level (D-010)" and "§3 sizes at a price repeated within one book are summed too", which uses `101` and `101.0`. Making the match scale-sensitive fails both.
 
 ## D-011 `excludedExchanges` lists both kinds of exclusion
 

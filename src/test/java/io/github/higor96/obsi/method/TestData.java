@@ -75,4 +75,19 @@ final class TestData {
     static List<String> names(List<Book> books) {
         return books.stream().map(Book::exchange).toList();
     }
+
+    /**
+     * Levels as "price x size" strings with trailing zeros dropped, so assertions compare values
+     * rather than scales: 100.0 and 100 both read "100".
+     */
+    static List<String> describe(List<Level> levels) {
+        return levels.stream()
+                .map(level -> level.price().stripTrailingZeros().toPlainString()
+                        + " x " + level.size().stripTrailingZeros().toPlainString())
+                .toList();
+    }
+
+    static Book book(String exchange, List<Level> bids, List<Level> asks) {
+        return new Book(exchange, bids, asks);
+    }
 }
