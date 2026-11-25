@@ -232,7 +232,7 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
 - **Question:** Which calculation times count as the weekend?
 - **Decision:** From Saturday 00:00:00Z inclusive to Monday 00:00:00Z exclusive, by `calculationTime`. Every other time is a weekday.
 - **Why:** It is the simplest rule to state to clients and needs no time zone beyond the input's own UTC. A Friday-evening start, as some markets use, is a calibration question for later.
-- **Tests:** Planned, regime rule.
+- **Tests:** `RegimePedLimitTest`: "Task 2 PED (D-022): the weekend runs from Saturday 00:00:00Z, inclusive, to Monday 00:00:00Z, exclusive" and the weekday and weekend limit tests.
 
 ## D-023 Task 2: unlock outranks weekend, which outranks weekday
 
@@ -240,7 +240,7 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
 - **Question:** A calculation time can fall in an unlock window and on a weekend. Which limit applies?
 - **Decision:** The unlock limit whenever an unlock window contains the time, otherwise the weekend limit on a weekend, otherwise the weekday limit.
 - **Why:** An unlock materially raises liquidity whatever the day, and the PM asked for the tightest limit then.
-- **Tests:** Planned, regime rule.
+- **Tests:** `RegimePedLimitTest`: "Task 2 PED (D-023): an unlock on a weekend gets the unlock limit, not the weekend one".
 
 ## D-024 Task 2: unlock events are an optional list of start times
 
@@ -252,7 +252,7 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
   - Under `--new-ped`, a field that is not an array of such strings is an input error, because a bad schedule must not silently change the limit.
   - The baseline ignores the field (D-018).
 - **Why:** Start times are what is announced, so the input carries exactly that. The calculator stays stateless: each snapshot carries the schedule it needs.
-- **Tests:** Planned, regime rule and reader.
+- **Tests:** `RegimePedLimitTest`: "Task 2 PED (D-024, D-025): an unlock window runs from its start, inclusive, for 48 hours, exclusive, at 2%", "Task 2 PED (D-024): an unlock that has not started yet does not apply" and "Task 2 PED (D-024): with several unlock events, any open window applies, whatever their order". Reading `unlockEvents`: planned, reader.
 
 ## D-025 Task 2: regime limits are named estimates awaiting calibration
 
@@ -260,7 +260,7 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
 - **Question:** What limit does each regime use?
 - **Decision:** Weekday 3%, weekend 5% (the baseline value), unlock 2%, unlock window 48 hours. They are named constants in one place, like the §7 values, and are marked as estimates.
 - **Why:** They express the PM's direction: weekdays tighter than weekends, and unlocks tightest. Calibrating them needs historical PED by regime and a record of known exchange incidents, which `proposal.md` lists as data needs.
-- **Tests:** Planned, regime rule.
+- **Tests:** `RegimePedLimitTest`: the weekday (3%), weekend (5%) and unlock window (2%) tests. The values live in `RegimeParameters`.
 
 ## D-026 Task 2: the output shape does not change
 
