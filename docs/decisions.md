@@ -24,17 +24,25 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
 
 - **Spec:** §2 entry screen; input contract, `price, size` are "positive JSON numbers".
 - **Question:** Does a numeric string such as `"100.5"` count as numeric?
-- **Decision:** No. A string, boolean or `null` component makes the entry non-numeric, so the entry is discarded.
+- **Decision:** No. A string, boolean, `null`, array or object component makes the entry non-numeric (`RawEntry.NonNumeric`), so the entry is discarded.
 - **Why:** The input contract types price and size as JSON numbers. Coercing strings would accept input the contract does not allow.
-- **Tests:** `BookScreenTest`: "§2 discards an entry whose price or size is not a JSON number (D-002)". JSON-type-to-empty-component mapping: planned, input reader.
+- **Tests:** `BookScreenTest`: "§2 discards an entry whose price or size is not a JSON number (D-002)". JSON-to-`RawEntry.NonNumeric` mapping: planned, input reader.
 
-## D-003 Exchange name problems fail the snapshot; unreadable sides exclude the book
+## D-003 A bad book is excluded without failing the snapshot
 
-- **Spec:** §2, "Exclude a book if its structure cannot be read" and "Malformed top-level input and missing required top-level fields are input errors"; input contract, `books[].exchange` is a "Unique, nonempty exchange name"; output contract, `metadata.excludedExchanges`.
-- **Question:** What happens to a book that is not a JSON object, a book whose `exchange` is missing, empty or not a string, or two books with the same name?
-- **Decision:** Input error for the whole snapshot. A book with a valid name whose `bids` or `asks` is missing or not an array is excluded and listed in `excludedExchanges`.
-- **Why:** The contract requires unique, nonempty names, and every excluded book must be reported by name. A book without a usable name cannot be reported, and duplicate names make the report ambiguous.
-- **Tests:** `BookScreenTest`: "§2 excludes a book whose bids cannot be read (D-003)" and "§2 excludes a book whose asks cannot be read (D-003)". Name checks and the JSON-to-empty-side mapping: planned, input reader.
+- **Spec:** §2, "Exclude a book if its structure cannot be read" and "Apply these checks to each book before combining exchanges"; input contract, `books[].exchange` is a "Unique, nonempty exchange name"; output contract, `metadata.excludedExchanges`.
+- **Question:** What happens to a book that is not a JSON object, a book whose `exchange` is missing, empty or not a string, a book whose `bids` or `asks` is missing or not an array, and two books with the same name?
+- **Decision:** Each of these is excluded, and the rest of the snapshot is still calculated.
+  - **Not a JSON object, or `exchange` missing, empty or not a string** (`RawBook.Unnamed`): excluded and not listed in `excludedExchanges`, because it has no name to report.
+  - **Valid name, but `bids` or `asks` missing or not an array** (`RawSide.Unreadable`): excluded and listed.
+  - **Several books with the same name:** all of them are excluded, whatever their content, and the name is listed once, at its first position. Names are compared exactly as written.
+
+  The one book-level problem that does fail the snapshot is a key repeated inside a book: the file is then not readable JSON (D-006).
+- **Why:**
+  - §2 screens each book on its own, so one bad book should not stop the others from being calculated.
+  - The output lists exchange names, and a nameless book has none. The README records that such a drop is not visible in the output.
+  - With duplicate names there is no way to tell which book is genuine, so neither is used.
+- **Tests:** `BookScreenTest`: "§2 excludes a book with no usable exchange name (D-003)", "§2 excludes a book whose bids cannot be read (D-003)" and "§2 excludes a book whose asks cannot be read (D-003)". Duplicate names: planned, §2 snapshot screen. JSON-to-`RawBook.Unnamed` and JSON-to-`RawSide.Unreadable` mappings: planned, input reader.
 
 ## D-004 `calculationTime` must end in `Z` and is echoed verbatim
 

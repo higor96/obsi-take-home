@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.higor96.obsi.input.RawBook;
 import io.github.higor96.obsi.input.RawEntry;
+import io.github.higor96.obsi.input.RawSide;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -54,8 +55,7 @@ class BookScreenTest {
         @DisplayName("§2 discards an entry whose price or size is not a JSON number (D-002)")
         void discardsNonNumericPriceOrSize() {
             List<Level> kept = BookScreen.screenEntries(List.of(
-                    new RawEntry.Pair(Optional.empty(), Optional.of(new BigDecimal("1"))),
-                    new RawEntry.Pair(Optional.of(new BigDecimal("100")), Optional.empty()),
+                    new RawEntry.NonNumeric(),
                     pair("100", "1")));
 
             assertEquals(List.of(level("100", "1")), kept);
@@ -102,9 +102,15 @@ class BookScreenTest {
         }
 
         @Test
+        @DisplayName("§2 excludes a book with no usable exchange name (D-003)")
+        void excludesUnnamedBook() {
+            assertEquals(Optional.empty(), BookScreen.screenBook(new RawBook.Unnamed()));
+        }
+
+        @Test
         @DisplayName("§2 excludes a book whose bids cannot be read (D-003)")
         void excludesBookWhoseBidsCannotBeRead() {
-            RawBook raw = new RawBook("Alpha", Optional.empty(), Optional.of(ONE_ASK));
+            RawBook raw = new RawBook.Named("Alpha", new RawSide.Unreadable(), new RawSide.Entries(ONE_ASK));
 
             assertEquals(Optional.empty(), BookScreen.screenBook(raw));
         }
@@ -112,7 +118,7 @@ class BookScreenTest {
         @Test
         @DisplayName("§2 excludes a book whose asks cannot be read (D-003)")
         void excludesBookWhoseAsksCannotBeRead() {
-            RawBook raw = new RawBook("Alpha", Optional.of(ONE_BID), Optional.empty());
+            RawBook raw = new RawBook.Named("Alpha", new RawSide.Entries(ONE_BID), new RawSide.Unreadable());
 
             assertEquals(Optional.empty(), BookScreen.screenBook(raw));
         }
