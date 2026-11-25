@@ -82,4 +82,13 @@ class RegimePedLimitTest {
         assertEquals(UNLOCK, new RegimePedLimit(List.of(future, ended, open)).regimeAt(TUESDAY_NOON));
         assertEquals(WEEKDAY, new RegimePedLimit(List.of(future, ended)).regimeAt(TUESDAY_NOON));
     }
+
+    @Test
+    @DisplayName("Task 2 PED (D-024): an unlock window that would end past the last representable instant still works")
+    void unlockWindowAtTheEndOfTimeDoesNotOverflow() {
+        // start + 48h is beyond Instant.MAX, so the window must not be computed as an end instant.
+        RegimePedLimit rule = new RegimePedLimit(List.of(Instant.parse("+1000000000-12-31T00:00:00Z")));
+
+        assertEquals(UNLOCK, rule.regimeAt(Instant.parse("+1000000000-12-31T12:00:00Z")));
+    }
 }

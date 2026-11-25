@@ -2,6 +2,7 @@ package io.github.higor96.obsi.method;
 
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -43,9 +44,12 @@ public record RegimePedLimit(List<Instant> unlockStarts) implements PedLimitRule
         return day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY ? Regime.WEEKEND : Regime.WEEKDAY;
     }
 
-    /** D-024: start ≤ t &lt; start + 48h. A start after t has not opened yet. */
+    /**
+     * D-024: start ≤ t &lt; start + 48h. A start after t has not opened yet. The elapsed time is
+     * compared instead of computing start + 48h, which can lie past {@code Instant.MAX}.
+     */
     private static boolean isInUnlockWindow(Instant start, Instant calculationTime) {
         return !calculationTime.isBefore(start)
-                && calculationTime.isBefore(start.plus(RegimeParameters.UNLOCK_WINDOW));
+                && Duration.between(start, calculationTime).compareTo(RegimeParameters.UNLOCK_WINDOW) < 0;
     }
 }

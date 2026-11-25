@@ -12,7 +12,7 @@ Requires Java 25; Maven comes from the wrapper (`./mvnw`).
 ./run.sh --new-ped data/new-ped.json  # Task 2 regime PED limit
 ```
 
-The sample publishes `100.23` with utilized depth `4`. It excludes Gamma, whose book is crossed, and Delta, whose PED is about 49.6%.
+The sample publishes `100.23` (depth `4`), excluding Gamma (crossed) and Delta (PED about 49.6%).
 
 It prints exactly one JSON object, even for an unexpected exception:
 
@@ -20,7 +20,7 @@ It prints exactly one JSON object, even for an unexpected exception:
 - **Input error or calculation failure:** stderr, exit 1.
 - **Usage error** (no path, two paths, unknown option): stderr, exit 2.
 
-`--new-ped` swaps the static 5% PED limit for the regime rule in `proposal.md`: 2% in an unlock window, 5% on UTC weekends, 3% otherwise.
+`--new-ped` reads the optional `unlockEvents` input and swaps `StaticPedLimit` (5%) for `RegimePedLimit` (D-021 to D-026), specified in `proposal.md`: 2% in an unlock window, 5% on UTC weekends, 3% otherwise.
 
 ## How the calculation runs
 
@@ -50,7 +50,7 @@ The §7 values live once in `Parameters` (PED limit 5, s = 1, D = 0.005, the 0.3
 
 ## Assumptions
 
-`docs/decisions.md` (D-001 to D-020) records every interpretation with its spec section and pinning test. Key ones:
+`docs/decisions.md` (D-001 to D-026) records every interpretation with its spec section and pinning test. Key ones:
 
 - **Bad books.** A bad book is excluded and never fails the snapshot (D-003).
   - A book without a usable name is excluded and not listed.
@@ -66,11 +66,11 @@ The §7 values live once in `Parameters` (PED limit 5, s = 1, D = 0.005, the 0.3
 
 ## Tests
 
-`./build.sh` runs 165 deterministic JUnit tests, with no randomness or network. Each display name starts with its spec section or contract. Two Eq. 2 tests have a 10 s guard timeout.
+`./build.sh` runs 194 deterministic JUnit tests, with no randomness or network. Each display name starts with its spec section or contract. Two Eq. 2 tests have a 10 s guard timeout.
 
 - **Layout.** One test class per step, plus reader, output and in-process CLI tests.
 - **Sample checks.** The consolidated book, curves at v = 1..5, v_T = 4 and 100.23 match hand calculations.
-- **Fixtures.** `eq3-constant-mid-tie.json` (a constant 100.225 mid must publish 100.23) and `data/new-ped.json` are checked against an independent Python calculation.
+- **Fixtures.** `eq3-constant-mid-tie.json` (a constant 100.225 mid must publish 100.23) and `data/new-ped.json` are checked against `tools/obsi_oracle.py`, an independent Python calculation.
 - **Red first, then mutants.** Hand-run mutants, such as `>=` at the PED limit or HALF_EVEN rounding, were all caught except Eq. 2's "first instead of last crossing", which no valid input distinguishes (D-017).
 - **Independent review.** A fresh-context reviewer probed 57 edge inputs. Its fixes are D-015, D-017, D-019 and D-020.
 
@@ -93,7 +93,7 @@ The §7 values live once in `Parameters` (PED limit 5, s = 1, D = 0.005, the 0.3
 ## Layout
 
 - **`docs/`:** the spec, the brief, `decisions.md`, and CME CF background in `reference/`.
-- **`proposal.md`:** the Task 2 PED proposal.
+- **`proposal.md`:** the Task 2 PED proposal; **`tools/`:** the Python oracle.
 - **`data/`:** input files.
 - **`src/main/java/.../obsi`:** `Main` and the `input/`, `method/`, `output/` packages; tests mirror them.
 

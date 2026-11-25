@@ -5,7 +5,7 @@
 The baseline excludes an exchange whose mid deviates more than a fixed 5% from the median (§2). The PM's notes say one number no longer fits:
 
 1. PED exists to catch temporary problems specific to one exchange.
-2. 5% was set wide for thin weekend liquidity, so it is too loose on weekdays.
+2. 5% was set wide for thin weekend liquidity; the PM thinks it is too loose on weekdays.
 3. Some new exchanges trade at a persistent premium that may be market structure, not error.
 4. Token unlocks are announced in advance. Liquidity rises for about 48 hours, and PED should then be much tighter.
 5. The answer should be financially grounded and easy to explain. It need not solve every concern.
@@ -42,7 +42,7 @@ Neither approach addresses the persistent premium (3).
 ## Why A
 
 - **It fits the PM's concerns.** It answers concerns 2 and 4 directly, and the unlock schedule is the one input the PM says is known ahead of time.
-- **It can be explained and checked.** Clients can be told the limit before it applies, and any published value can be re-derived from its input alone. That suits a benchmark's preference for rules fixed in advance.
+- **It is known in advance.** The limit is set before a snapshot is taken, so clients can be told it ahead of time, as benchmarks prefer.
 - **B's limit is harder to trust.** B adapts to surprises, but moves every snapshot and is easiest to push when few exchanges contribute, exactly when the screen matters most.
 
 ## Specification
@@ -58,7 +58,7 @@ Neither approach addresses the persistent premium (3).
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `unlockEvents` (optional, top level) | array of ISO-8601 UTC strings ending in `Z` | Announced unlock start times; each opens a 48-hour window |
+| `unlockEvents` (optional, top level) | array of ISO-8601 UTC times with seconds, ending in `Z` | Announced unlock start times; each opens a 48-hour window |
 
 - **Absent or `[]`:** no unlock.
 - **Anything else invalid:** under `--new-ped`, any other value is an input error that echoes `calculationTime`, because a malformed schedule must not silently change the limit.
@@ -70,14 +70,14 @@ Neither approach addresses the persistent premium (3).
 - Epsilon, an exchange 2.49% above the median;
 - Zeta, an exchange near the median, which keeps the median at 100.25.
 
-The baseline keeps Epsilon and publishes `100.35`. `--new-ped` excludes it and publishes `100.21`. Both values match an independent implementation of the spec.
+The baseline keeps Epsilon and publishes `100.35`. `--new-ped` excludes it and publishes `100.21`. Both values match `tools/obsi_oracle.py`, an independent implementation of the spec.
 
 ## Calibration and data needs
 
 Calibrating the limits needs:
 
 - per-exchange PED history, tagged by regime;
-- the history of unlock events;
+- the unlock schedule: its history, and an owned, maintained feed for live runs;
 - a log of exchange incidents, such as outages, stale books and bad prints.
 
 For each regime, set the limit at a high percentile of the PED of exchanges with no incident at the time. Check it against the incident log, and review it on a fixed schedule. The same data shows whether the weekend should start on Friday evening, and whether 48 hours matches observed liquidity.
@@ -91,7 +91,7 @@ For each regime, set the limit at a high percentile of the PED of exchanges with
 
 - **Fewer constituents.** A tighter limit excludes more books. If every book is excluded, nothing is published (§6). Production should monitor the constituent count and define a fallback.
 - **Edges.** The limit jumps at regime boundaries, so adjacent snapshots can treat the same deviation differently.
-- **Schedule dependency.** A missing `unlockEvents` falls back to the looser limit. That is safe, but less sensitive.
+- **Schedule dependency.** A missing or misspelled `unlockEvents` fails open: the looser limit applies during a real unlock.
 - **Transparency.** The output does not show the regime (D-026); showing it would help clients but change the output contract.
 
-**Future work:** keep A as the base, and let B's spread signal only widen the limit when spreads blow out. That keeps A predictable in normal markets and covers unscheduled stress.
+**Future work:** keep A as the base, and let B's spread signal only widen it when spreads blow out.

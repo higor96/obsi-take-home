@@ -118,7 +118,7 @@ class MainTest {
     @Test
     @DisplayName("Task 2 CLI (D-021, D-026): --new-ped data/new-ped.json applies the 2% unlock limit and excludes Epsilon")
     void newPedAppliesTheUnlockLimit() {
-        // Expected values from an independent Python calculation of the spec at a 2% PED limit.
+        // Expected values from tools/obsi_oracle.py, an independent calculation of the spec, at a 2% PED limit.
         Result result = run("--new-ped", "data/new-ped.json");
 
         assertEquals(Main.PUBLISHED, result.exitCode());
@@ -140,7 +140,7 @@ class MainTest {
     @Test
     @DisplayName("Task 2 CLI (D-018, D-021): without --new-ped the same file uses the static 5% and keeps Epsilon")
     void baselineKeepsEpsilon() {
-        // Expected values from an independent Python calculation of the spec at a 5% PED limit.
+        // Expected values from tools/obsi_oracle.py, an independent calculation of the spec, at a 5% PED limit.
         JsonNode output = parse(run("data/new-ped.json").out());
 
         assertEquals("100.35", output.get("value").textValue());
@@ -149,7 +149,7 @@ class MainTest {
     }
 
     @Test
-    @DisplayName("Task 2 CLI (D-022, D-024): --new-ped with no unlockEvents on a weekday uses 3%, so the sample publishes 100.23 as before")
+    @DisplayName("Task 2 CLI (D-024): --new-ped on a file without unlockEvents runs, and the sample still publishes 100.23")
     void newPedOnTheSampleMatchesTheBaseline() {
         Result result = run("--new-ped", "data/sample-input.json");
 
