@@ -18,7 +18,7 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
 - **Question:** Is an entry that is not a two-element array (`[100]`, `[100, 1, 7]`, `null`, an object) a bad entry or an unreadable book?
 - **Decision:** Discard the entry. "Structure cannot be read" applies only to the book object and its `bids`/`asks` arrays (see D-003).
 - **Why:** The entry rule is the narrower one and keeps the rest of a usable book. A book that loses every entry on one side is still excluded by the empty-side rule.
-- **Tests:** `BookScreenTest`: "§2 discards an entry that is not a [price, size] pair (D-001)" and "§2 discarding an entry keeps the rest of the side, in input order (D-001)". JSON-to-`RawEntry.NotAPair` mapping: planned, input reader.
+- **Tests:** `BookScreenTest`: "§2 discards an entry that is not a [price, size] pair (D-001)" and "§2 discarding an entry keeps the rest of the side, in input order (D-001)". `SnapshotReaderTest`: "D-001 an entry that is not a two-element array is read as NotAPair" and "D-001 entries keep their input order, whatever their kind".
 
 ## D-002 Only JSON numbers are numeric
 
@@ -26,7 +26,7 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
 - **Question:** Does a numeric string such as `"100.5"` count as numeric?
 - **Decision:** No. A string, boolean, `null`, array or object component makes the entry non-numeric (`RawEntry.NonNumeric`), so the entry is discarded.
 - **Why:** The input contract types price and size as JSON numbers. Coercing strings would accept input the contract does not allow.
-- **Tests:** `BookScreenTest`: "§2 discards an entry whose price or size is not a JSON number (D-002)". JSON-to-`RawEntry.NonNumeric` mapping: planned, input reader.
+- **Tests:** `BookScreenTest`: "§2 discards an entry whose price or size is not a JSON number (D-002)". `SnapshotReaderTest`: "D-002 an entry with a component that is not a JSON number is read as NonNumeric".
 
 ## D-003 A bad book is excluded without failing the snapshot
 
@@ -48,7 +48,7 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
   - "§2 a book with no usable exchange name is excluded and not listed (D-003)";
   - "§2 books sharing an exchange name are all excluded, listed once at the first position (D-003)".
 
-  JSON-to-`RawBook.Unnamed` and JSON-to-`RawSide.Unreadable` mappings: planned, input reader.
+  `SnapshotReaderTest`: "D-003 a book that is not an object, or has no usable exchange name, is read as Unnamed", "D-003 a side that is not an array is read as Unreadable", "D-003 a missing side is read as Unreadable" and "D-003 an exchange name is kept exactly as written".
 
 ## D-004 `calculationTime` must end in `Z` and is echoed verbatim
 
@@ -56,7 +56,7 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
 - **Question:** Which strings count as ISO-8601 UTC, what is echoed, and when is the failure output's `calculationTime` `null`?
 - **Decision:** Accept a string that `Instant.parse` reads and that ends in `Z`. Offsets such as `+00:00` or `+01:00` are input errors; `Instant.parse` alone accepts offsets, so the `Z` check is explicit. Echo the input string unchanged, never a reformatted instant. On failure, echo it whenever it is valid. It is `null` only when it is missing or invalid, or when the file is not readable JSON, which includes content after the document and a repeated key (D-006).
 - **Why:** The contract asks for UTC. Echoing the original string avoids reformatting differences such as dropped fractional seconds. A valid time still identifies the failed snapshot when another field is malformed.
-- **Tests:** Planned, input reader and CLI.
+- **Tests:** `SnapshotReaderTest`: the "§2 ... calculationTime ..." and "§2 ... books ..." tests, "D-004 a calculationTime with fractional seconds is accepted and kept exactly as written", and "§2 input that is not readable JSON is an input error, with no time to echo even if one was written (D-004, D-006)". Removing the explicit `Z` check lets `+00:00`, `+01:00` and a lowercase `z` through, and the tests catch it. Failure output: planned, CLI.
 
 ## D-005 An empty `books` array is a calculation failure
 
@@ -82,7 +82,7 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
   - Both number settings are needed. With Jackson's defaults, `100.1234567890123456789012345` and `1e400` arrive as `double`. With only the first setting, `100.20` still comes back as `100.2`.
   - Without the two strictness settings, Jackson silently ignores content after the document and keeps the last value of a repeated key. The calculation would then run on data the file does not state unambiguously. A file with a repeated key is not reliably readable JSON, so it fails as a whole rather than book by book.
   - Version 2.x rather than 3.x: 2.x is the API most Java engineers know, and it is still maintained. 2.23.0 was released on 2026-11-24, too recently to adopt.
-- **Tests:** `ExactJsonTest`.
+- **Tests:** `ExactJsonTest`. `SnapshotReaderTest`: "D-006 entry numbers are read exactly as written, zero and negative included (the §2 screen drops those)" and "§2 the reason for unreadable JSON is concise: where it broke and a short cause, no parser internals". That reason keeps the line and column and Jackson's wording up to its first ": ", which drops configuration hints and source excerpts; content after the document gets our own wording.
 
 ## D-007 Exponential weights use `StrictMath.exp`
 
@@ -184,3 +184,11 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
 - **Decision:** No. `UtilizedDepth.of` scans every candidate whose \(v_i\) and \(v_{i+1}\) are both defined and keeps the largest crossing, as Eq. 2 is written. It stops at the first undefined \(v_{i+1}\), because the curves are defined on \((0,\text{total size of the shallower side}]\). The empty set fails with one of two reasons: "insufficient depth" when the curves do not reach \(2s\), and "no mid-spread cutoff crossing" otherwise.
 - **Why:** Reading the code against Eq. 2 needs no extra argument, and the scan costs the same order as the Eq. 3 sum. A consequence for testing: a mutant that keeps the first crossing instead of the last passes every test, and no valid input can tell the two apart.
 - **Tests:** `UtilizedDepthTest`.
+
+## D-018 Fields outside the input contract are ignored
+
+- **Spec:** Assessment PDF, input contract (`calculationTime`, `books`, `books[].exchange`, `books[].bids`, `books[].asks`); §2, "Malformed top-level input and missing required top-level fields are input errors".
+- **Question:** The contract lists the fields it needs but does not say whether others may appear. Is an extra field, such as a top-level `"source"` or a book-level `"venue"`, malformed input?
+- **Decision:** No. The reader ignores any field it does not use, at the top level and in each book.
+- **Why:** Extra fields do not affect the calculation. Task 2 may add input fields (`data/new-ped.json`), and the baseline should still read such a file.
+- **Tests:** `SnapshotReaderTest`: "D-018 fields outside the input contract are ignored, at the top level and in books".
