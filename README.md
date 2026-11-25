@@ -93,9 +93,10 @@ The §7 values live once in `Parameters` (PED limit 5, s = 1, D = 0.005, the 0.3
 ## Layout
 
 - **`docs/`:** the spec, the brief, `decisions.md`, and CME CF background in `reference/`.
+- **`proposal.md`:** the Task 2 PED proposal.
 - **`data/`:** input files.
 - **`src/main/java/.../obsi`:** `Main` and the `input/`, `method/`, `output/` packages; tests mirror them.
 
 ## Still to do
 
-`proposal.md` and the AI transcript.
+The AI transcript.
