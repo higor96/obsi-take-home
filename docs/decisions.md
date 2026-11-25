@@ -162,17 +162,17 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
 
 - **Spec:** Eq. 3 and the definition of \(NF\) (§5); §5, "Round the published value to two decimal places using Java `HALF_UP` rounding".
 - **Question:** Weighted means computed with rounded intermediate steps can land just below a rounding tie. How is Eq. 3 evaluated?
-- **Decision:** Compute each weight \(w_v=\lambda e^{-\lambda v}\) (D-007). Accumulate both \(\sum_v \operatorname{midPV}_T(v)\,w_v\) and \(NF=\sum_v w_v\) with exact `BigDecimal` multiply and add, with no `MathContext`. Divide once at the end, numerator by \(NF\), at 34 significant digits (D-015). Never normalize each weight first.
+- **Decision:** Compute each weight \(w_v=\lambda e^{-\lambda v}\) (D-007). Accumulate both \(\sum_v \operatorname{midPV}_T(v)\,w_v\) and \(NF=\sum_v w_v\) with exact `BigDecimal` multiply and add, with no `MathContext`. Divide once at the end, numerator by \(NF\), straight to two decimal places with `HALF_UP` (D-015). Never normalize each weight first.
 - **Why:** When \(\operatorname{midPV}_T\) is a constant \(c\), the only case in which an exact tie is possible (D-007), the numerator is exactly \(c\cdot NF\). The single division then returns exactly \(c\), and `HALF_UP` rounds it correctly. Dividing each weight by \(NF\) first rounds every term, so \(c\sum_v w_v/NF\) can come out as `x.xx4999…` and round down.
 - **Tests:** `IndexValueTest`: "Eq. 3 constant midPV at a .xx5 tie: v_T = 5, OBSI exactly 100.225, published 100.23 (D-007, D-014)". Rounding each numerator term to 16 digits instead turns that value into `100.2249999999999907…`, which publishes as `100.22`; the test catches it.
 
-## D-015 Precision of steps that do not terminate
+## D-015 Precision: only λ is rounded; the published value is rounded once
 
-- **Spec:** §7, \(\lambda=1/(0.3v_T)\); Eq. 3, division by \(NF\); §5 rounding.
+- **Spec:** §7, \(\lambda=1/(0.3v_T)\); Eq. 3, division by \(NF\); §5, "Round the published value to two decimal places using Java `HALF_UP` rounding".
 - **Question:** The spec fixes only the published rounding. What precision do the other non-terminating steps use?
-- **Decision:** Arithmetic is exact wherever the result terminates: sums, products (including the Eq. 3 numerator and \(NF\), D-014), and halving for mid-prices and the even-count median. Divisions that do not terminate (\(\lambda\) and division by \(NF\)) use 34 significant digits (`MathContext.DECIMAL128`). The 0.3 in \(\lambda\) is `Parameters.LAMBDA_DEPTH_FACTOR`, passed in like the other §7 values. Only the published value is rounded to two places with `HALF_UP`.
-- **Why:** 34 digits is far beyond the two published decimals, and the spec prescribes `HALF_UP` only for the published value. The published value is the 34-digit quotient rounded again to two places. That double rounding could only change a result within \(10^{-32}\) of a tie, far inside the residual D-007 already accepts.
-- **Tests:** `IndexValueTest`: "§5 the published value is rounded to two decimals with HALF_UP" (100.2249 → 100.22, 100.225 → 100.23, 100.2251 → 100.23, 100.125 → 100.13) and "Eq. 3 with v_T = s the index is midPV(s) exactly, published with two decimals".
+- **Decision:** Arithmetic is exact wherever it terminates, including the Eq. 3 numerator and \(NF\) (D-014). \(\lambda\) is computed to 34 significant digits (`MathContext.DECIMAL128`). The published value is `numerator.divide(nf, 2, RoundingMode.HALF_UP)`: the exact ratio, rounded once. `IndexValue.unrounded` (40 decimal places) exists only for diagnostics and tests.
+- **Why:** An earlier version divided to 34 significant digits and then called `setScale(2, HALF_UP)`. The independent review (R-01) showed that loses the cents once the value has 32 or more integer digits, and it rounds twice. Rounding the exact ratio once has neither problem. λ only scales the weights, so relative precision is enough there. The 0.3 in λ is `Parameters.LAMBDA_DEPTH_FACTOR`.
+- **Tests:** `IndexValueTest`: "§5 the published value is rounded to two decimals with HALF_UP", "§5 the cents survive at any magnitude: a constant mid of 1e33 + 0.25 publishes ….25 (D-015)" and "§5 HALF_UP is applied once, to the exact Eq. 3 ratio: a mid just below 100.225 publishes 100.22 (D-015)".
 
 ## D-016 Output formatting
 

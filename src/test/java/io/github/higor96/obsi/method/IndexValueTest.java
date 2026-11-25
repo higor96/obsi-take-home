@@ -75,6 +75,24 @@ class IndexValueTest {
         assertPublished("100.13", curvesWithFirstMid("100.1", "100.15"));       // 100.125, HALF_EVEN would give 100.12
     }
 
+    @Test
+    @DisplayName("§5 the cents survive at any magnitude: a constant mid of 1e33 + 0.25 publishes ….25 (D-015)")
+    void centsSurviveAtAnyMagnitude() {
+        ConsolidatedBook.Uncrossed book = new ConsolidatedBook.Uncrossed(
+                List.of(level("1000000000000000000000000000000000", "1"), level("1", "1")),
+                List.of(level("1000000000000000000000000000000000.5", "1"), level("1e34", "1")));
+
+        assertPublished("1000000000000000000000000000000000.25", new PriceVolumeCurves(book, Parameters.SPACING));
+    }
+
+    @Test
+    @DisplayName("§5 HALF_UP is applied once, to the exact Eq. 3 ratio: a mid just below 100.225 publishes 100.22 (D-015)")
+    void halfUpIsAppliedOnceToTheExactRatio() {
+        // mid = (100.2 + 100.249…998) / 2 = 100.224999999999999999999999999999999999, 36 decimal places.
+        // Rounding to 34 significant digits first would give 100.225 and then 100.23.
+        assertPublished("100.22", curvesWithFirstMid("100.2", "100.249999999999999999999999999999999998"));
+    }
+
     /** A book whose first sample has the given best bid and ask, with a wide second level so that v_T = 1. */
     private static PriceVolumeCurves curvesWithFirstMid(String bestBid, String bestAsk) {
         ConsolidatedBook.Uncrossed book = new ConsolidatedBook.Uncrossed(

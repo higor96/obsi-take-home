@@ -24,7 +24,7 @@ Every decision goes into `docs/decisions.md`, citing the spec section or equatio
 - No `double` or `float` anywhere in the calculation path.
 - One exception: the Eq. 3 weights use `StrictMath.exp((λv).doubleValue())`, converted back with `new BigDecimal(double)`. Never `Math.exp`. It is only safe because Eq. 3 accumulates the numerator and NF with exact multiply/add and divides once at the end; never normalize weights one by one. See D-007 and D-014 in `docs/decisions.md`.
 - Parse JSON numbers straight into `BigDecimal`. Never go through `double` on the way.
-- Published value: `value.setScale(2, RoundingMode.HALF_UP)`.
+- Published value: HALF_UP to two places, applied once to the exact Eq. 3 ratio: `numerator.divide(nf, 2, RoundingMode.HALF_UP)`. Never round to an intermediate precision first (D-015).
 
 ## Tests
 
