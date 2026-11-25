@@ -56,7 +56,7 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
 - **Question:** Which strings count as ISO-8601 UTC, what is echoed, and when is the failure output's `calculationTime` `null`?
 - **Decision:** Accept a string that `Instant.parse` reads and that ends in `Z`. Offsets such as `+00:00` or `+01:00` are input errors; `Instant.parse` alone accepts offsets, so the `Z` check is explicit. Echo the input string unchanged, never a reformatted instant. On failure, echo it whenever it is valid. It is `null` only when it is missing or invalid, or when the file is not readable JSON, which includes content after the document and a repeated key (D-006).
 - **Why:** The contract asks for UTC. Echoing the original string avoids reformatting differences such as dropped fractional seconds. A valid time still identifies the failed snapshot when another field is malformed.
-- **Tests:** `SnapshotReaderTest`: the "§2 ... calculationTime ..." and "§2 ... books ..." tests, "D-004 a calculationTime with fractional seconds is accepted and kept exactly as written", and "§2 input that is not readable JSON is an input error, with no time to echo even if one was written (D-004, D-006)". Removing the explicit `Z` check lets `+00:00`, `+01:00` and a lowercase `z` through, and the tests catch it. Failure output: planned, CLI.
+- **Tests:** `SnapshotReaderTest`: the "§2 ... calculationTime ..." and "§2 ... books ..." tests, "D-004 a calculationTime with fractional seconds is accepted and kept exactly as written", and "§2 input that is not readable JSON is an input error, with no time to echo even if one was written (D-004, D-006)". Removing the explicit `Z` check lets `+00:00`, `+01:00` and a lowercase `z` through, and the tests catch it. `MainTest`: "§2 CLI: an input error after a valid calculationTime still echoes it (D-004)" and "§2 CLI: unreadable JSON fails with calculationTime null (D-004, D-006)". `ResultJsonTest`: "Output contract: a failed result prints calculationTime null when the input had none (D-004)".
 
 ## D-005 An empty `books` array is a calculation failure
 
@@ -76,7 +76,7 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
   - `DeserializationFeature.FAIL_ON_TRAILING_TOKENS` is enabled, so content after the JSON document is rejected.
   - `StreamReadFeature.STRICT_DUPLICATE_DETECTION` is enabled, so a key repeated in one object is rejected at any depth.
 
-  The last two make the whole file unreadable, so the snapshot fails with `calculationTime: null` (D-004). That holds even when the repeated key is inside one book: this is the one book-level problem that fails the snapshot (see D-003). Jackson is bundled into `target/obsi.jar` with maven-shade, so `run.sh` stays unchanged. Jackson is used only in `input/`; the calculation classes see plain records.
+  The last two make the whole file unreadable, so the snapshot fails with `calculationTime: null` (D-004). That holds even when the repeated key is inside one book: this is the one book-level problem that fails the snapshot (see D-003). Jackson is bundled into `target/obsi.jar` with maven-shade, so `run.sh` stays unchanged. Jackson parses only in `input/`, and `output/` uses its string escaping. The calculation classes see plain records.
 - **Why:**
   - Jackson is well known and well tested. A hand-written parser would be more code to test for no gain in the calculation.
   - Both number settings are needed. With Jackson's defaults, `100.1234567890123456789012345` and `1e400` arrive as `double`. With only the first setting, `100.20` still comes back as `100.2`.
@@ -100,15 +100,20 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
   - "Eq. 3 constant midPV at a .xx5 tie: v_T = 5, OBSI exactly 100.225, published 100.23 (D-007, D-014)". This is one book with bids `[[100.20, 5], [98.00, 5]]` and asks `[[100.25, 5], [102.00, 5]]`, so \(\operatorname{midPV}=100.225\) for \(v=1..5\).
   - "Eq. 3 sample snapshot: OBSI matches the 60-digit reference to within 1e-14 and publishes as 100.23". The reference was computed independently with Python's `decimal` module. The measured error is \(1.7\times10^{-19}\).
 
-  The same tie book as JSON (`src/test/resources/fixtures/eq3-constant-mid-tie.json`): planned, end-to-end at the CLI step.
+  `MainTest`: "CLI: the constant mid-price tie fixture publishes 100.23 with v_T = 5 (D-007, D-014)" runs the same book from `src/test/resources/fixtures/eq3-constant-mid-tie.json` through the CLI.
 
 ## D-008 Exit codes and usage errors
 
 - **Spec:** Assessment PDF, failure output ("print one JSON object to standard error ... and exit nonzero") and command-line interface.
 - **Question:** Which nonzero codes are used, and how are usage errors and unreadable files reported?
-- **Decision:** Exit 0 when the value is published. Exit 1 for any failed calculation or input error, including an unreadable file (reported with `calculationTime: null`). Exit 2 for usage errors such as a missing path or an unknown flag. Every failure prints the failure JSON on stderr and nothing on stdout.
-- **Why:** Separates a caller's mistake from a snapshot that cannot be published, while keeping one machine-readable failure shape.
-- **Tests:** Planned, CLI.
+- **Decision:**
+  - **Exit 0:** the value is published, as one JSON object on stdout.
+  - **Exit 1:** any failed calculation or input error. An unreadable file is reported with `calculationTime: null` and a reason such as `cannot read input file data/x.json: no such file`.
+  - **Exit 2:** a usage error, meaning no input path, more than one path, or an unknown `--` option. The reason ends with `usage: ./run.sh [--new-ped] <input.json>`.
+
+  Every failure prints the failure JSON on stderr and nothing on stdout. An unexpected exception, which would be a bug, is still reported that way, as `internal error: ...` with exit 1, never as a stack trace. `--new-ped` is recognised, but until Task 2 it fails with `--new-ped is not implemented yet` and exit 2. Both streams are written as UTF-8 with `\n` line endings, whatever the platform default.
+- **Why:** Separates a caller's mistake from a snapshot that cannot be published, while keeping one machine-readable failure shape on the designated stream.
+- **Tests:** `MainTest`: "D-008 CLI: a missing input file fails with calculationTime null and exit 1", "D-008 CLI: no input path, two paths, or an unknown option is a usage error: failure JSON on stderr, exit 2" and "CLI: --new-ped is recognised but fails until the Task 2 calculation exists". Every `MainTest` failure case also checks that stdout stays empty. The `internal error` path has no test, because no valid input reaches it.
 
 ## D-009 Best bid and best ask are the extreme prices, not the first entries
 
@@ -132,7 +137,7 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
 - **Question:** Does the list include books excluded for structure, for PED, or both?
 - **Decision:** Both, in input order, each exchange once.
 - **Why:** §2, "Constituent order book screens", covers both checks. The sample input excludes Gamma (crossed book) and Delta (PED).
-- **Tests:** `BookScreenTest`: "§2 sample snapshot: Gamma (crossed) and Delta (PED) are excluded, in input order (D-011)" and "§2 excluded exchanges keep input order across the structural and PED screens (D-011)". End-to-end sample test: planned, CLI.
+- **Tests:** `BookScreenTest`: "§2 sample snapshot: Gamma (crossed) and Delta (PED) are excluded, in input order (D-011)" and "§2 excluded exchanges keep input order across the structural and PED screens (D-011)". `MainTest`: "CLI: data/sample-input.json publishes 100.23 on stdout with exit 0 and nothing on stderr".
 
 ## D-012 The PED limit is compared exactly
 
@@ -173,9 +178,9 @@ Interpretations of `docs/obsi-methodology.md` where the spec is ambiguous. Each 
 
 - **Spec:** Assessment PDF, successful output and failure output.
 - **Question:** How are the decimal strings and the JSON layout written?
-- **Decision:** `value` is written with `setScale(2, RoundingMode.HALF_UP).toPlainString()`. `utilizedDepth` is written with `toPlainString()` and no trailing zeros (`"4"`, never `"4.0"` or `"4E+0"`). The JSON is pretty-printed with two-space indentation and fields in the PDF's order.
+- **Decision:** `value` is written with `setScale(2, RoundingMode.HALF_UP).toPlainString()`. `utilizedDepth` is written with `toPlainString()` and no trailing zeros (`"4"`, never `"4.0"` or `"4E+0"`). The JSON is pretty-printed with two-space indentation and fields in the PDF's order. `excludedExchanges` is written on one line, `[]` when empty. Strings are escaped with Jackson's `JsonStringEncoder`.
 - **Why:** This matches the PDF examples, and `toPlainString()` never uses scientific notation.
-- **Tests:** Planned, CLI and the end-to-end sample test.
+- **Tests:** `ResultJsonTest`: both output shapes as exact text, an empty array without exponent notation, and escaping of quotes, backslashes and control characters. `MainTest`: "CLI: data/sample-input.json publishes 100.23 on stdout with exit 0 and nothing on stderr", compared as exact text.
 
 ## D-017 Eq. 2 is evaluated as written, although its set has at most one element
 
