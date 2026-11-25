@@ -1,6 +1,6 @@
 # OBSI — Order Book Snapshot Index
 
-A Java 25 command-line implementation of the Order Book Snapshot Index (OBSI). It reads one snapshot JSON file and prints one JSON result. This is the handoff note for the next Index Engineer.
+A Java 25 CLI for the Order Book Snapshot Index (OBSI): one snapshot JSON in, one JSON result out. This is the handoff note for the next Index Engineer.
 
 ## Build and run
 
@@ -13,7 +13,7 @@ Requires Java 25; Maven comes from the wrapper (`./mvnw`).
 
 The sample publishes `100.23` with utilized depth `4`. It excludes Gamma, whose book is crossed, and Delta, whose PED is about 49.6%.
 
-The program prints exactly one JSON object; an unexpected exception is reported as JSON too:
+It prints exactly one JSON object, even for an unexpected exception:
 
 - **Published:** stdout, exit 0.
 - **Input error or calculation failure:** stderr, exit 1.
@@ -27,29 +27,29 @@ The program prints exactly one JSON object; an unexpected exception is reported 
 
 | Spec | Class | Does |
 | --- | --- | --- |
-| Input contract | `input.SnapshotReader` | JSON to raw books, sides and entries; applies no methodology rule |
-| §2 screens | `BookScreen` | Drops non-numeric or non-positive entries; excludes unreadable, one-sided, crossed or locked books |
+| Input contract | `input.SnapshotReader` | JSON to raw records; no methodology rules |
+| §2 screens | `BookScreen` | Drops bad entries; excludes unreadable, one-sided, crossed or locked books |
 | §2 PED | `DeviationScreen` | Median of valid mids; excludes PED above the limit |
-| §3 | `Consolidation` | Sums sizes per price, sorts, uncrosses; the `Crossed`/`Uncrossed` types stop curves being built from a crossed book |
+| §3 | `Consolidation` | Sums per price, sorts, uncrosses; `Crossed`/`Uncrossed` types keep crossed books out of §4 |
 | §4 Eq. 1a–1f | `PriceVolumeCurves` | Ask, bid and mid curves; mid-spread against D |
 | §5 Eq. 2 | `UtilizedDepth` | Largest v_i with midSV ≤ D and midSV(v_{i+1}) > D |
 | §5 Eq. 3 | `IndexValue` | Weighted mean of midPV, HALF_UP to two places |
 | Output | `output.ResultJson`, `Main` | PDF shapes, streams, exit codes |
 
-The §7 values are defined once, in `Parameters`: PED limit 5, s = 1, D = 0.005, and the 0.3 in λ. They are passed into each step.
+The §7 values live once in `Parameters` (PED limit 5, s = 1, D = 0.005, the 0.3 in λ) and are passed into each step.
 
 ## Numbers
 
 - **`BigDecimal` throughout.** JSON numbers are parsed straight into `BigDecimal` and keep their written scale.
-- **Boundaries without division.** PED uses `100·|m − m̃| > L·m̃`, and the mid-spread uses `askPV ≤ (1 + D)·midPV`. A book at exactly 5%, or a mid-spread exactly at D, lands where the spec says.
+- **Boundaries without division.** PED uses `100·|m − m̃| > L·m̃`, and the mid-spread uses `askPV ≤ (1 + D)·midPV`. Exact-boundary cases land where the spec says.
 - **One `double`.** Eq. 3's `e^(−λv)` uses `StrictMath.exp`, which gives identical bits on every JVM.
-  - The numerator and NF are summed exactly and divided once, at 34 digits.
-  - A constant mid-price, the only case that can give an exact `.xx5` tie, therefore publishes exactly.
+  - The numerator and NF are summed exactly. The published value is their exact ratio, rounded once, HALF_UP (D-015).
+  - A constant mid-price, the only case that can give an exact `.xx5` tie, therefore publishes exactly at any magnitude.
   - The sample is 1.7e-19 from an independent 60-digit reference.
 
 ## Assumptions
 
-Every interpretation is in `docs/decisions.md` (D-001 to D-018), with its spec section and pinning test. The most important:
+`docs/decisions.md` (D-001 to D-020) records every interpretation with its spec section and pinning test. Key ones:
 
 - **Bad books.** A bad book is excluded and never fails the snapshot (D-003).
   - A book without a usable name is excluded and not listed.
@@ -59,43 +59,42 @@ Every interpretation is in `docs/decisions.md` (D-001 to D-018), with its spec s
 - **`calculationTime`.** It must end in `Z` and is echoed as written. It is `null` only when invalid or the file was unreadable (D-004).
 - **Empty `books`.** It fails as no surviving book (D-005).
 - **Prices.** Best prices are found by value (D-009), and `99.8` equals `99.80` (D-010).
-- **Eq. 2.** midSV never decreases with v for an uncrossed book, so Eq. 2's set holds at most one element. The code still takes the maximum, as written (D-017).
+- **Eq. 2.** midSV never decreases with v for an uncrossed book, so Eq. 2's set holds at most one element, and the scan stops there (D-017).
+- **Uncrossing.** After the §2 screens it cannot exhaust a side, so that §6 failure appears only in unit tests.
+- **Numbers.** A number needing over 1000 digits written out is an input error (D-019). A leading BOM is ignored (D-020).
 
 ## Tests
 
-`./build.sh` runs 155 deterministic JUnit tests, with no clock, randomness or network. Each display name cites its spec section or decision.
+`./build.sh` runs 165 deterministic JUnit tests, with no randomness or network. Each display name starts with its spec section or contract. Two Eq. 2 tests have a 10 s guard timeout.
 
-- **Layout.** One test class per step, plus `SnapshotReaderTest`, `ResultJsonTest`, and `MainTest`, which drives the CLI in-process.
+- **Layout.** One test class per step, plus reader, output and in-process CLI tests.
 - **Sample checks.** The consolidated book, curves at v = 1..5, v_T = 4 and 100.23 match hand calculations.
 - **Tie fixture.** `src/test/resources/fixtures/eq3-constant-mid-tie.json` has a constant mid of 100.225 that must publish 100.23.
-- **Red first, then mutation checks.** Every step was written red first. Hand-run mutants included `>` to `>=` at the PED limit, HALF_UP to HALF_EVEN, and rounding inside the Eq. 3 sum. All were caught except "first crossing instead of last" in Eq. 2, which no valid input distinguishes (D-017).
+- **Red first, then mutants.** Hand-run mutants, such as `>=` at the PED limit or HALF_EVEN rounding, were all caught except Eq. 2's "first instead of last crossing", which no valid input distinguishes (D-017).
+- **Independent review.** A fresh-context reviewer probed 57 edge inputs. Its fixes are D-015, D-017, D-019 and D-020.
 
 ## Production gaps
 
-- **Silent drops.** Nameless books, and the reason behind each exclusion, are not reported. This needs a diagnostics channel.
+- **Silent drops.** Nameless books and exclusion reasons are not reported; this needs a diagnostics channel.
 - **No audit trail.** Inputs, intermediate results and outputs are not stored, so a published value cannot be re-derived.
 - **Offline only.** One run per file, with no feed, scheduler, retries or staleness checks.
-- **Unbounded cost.** The file is read whole, and Eq. 2 and Eq. 3 loop once per sample up to the book's depth. This is not tuned for very deep books.
+- **Unbounded cost.** Files are read whole, Eq. 3 loops to v_T, and Eq. 2 scans a book that never crosses D in full.
 - **Parser limits.** Jackson's default limits on number length and nesting depth apply.
 - **No automation.** Mutation testing was manual (PIT would make it repeatable), and there is no CI.
 - **Accepted residual.** A value within the `double` error (about 1e-14) of a `.xx5` tie could round differently from exact arithmetic (D-007).
 
 ## Dependencies
 
-- **Jackson databind 2.22** (runtime): parses JSON with numbers going straight to exact `BigDecimal` (D-006), and escapes output strings. It is well known and tested; a hand-written parser would be more code to test.
+- **Jackson databind 2.22** (runtime): parses JSON straight to exact `BigDecimal` (D-006) and escapes output strings. Well known, and less to test than a hand-written parser.
 - **JUnit Jupiter 6** (test).
 
 `maven-shade-plugin` bundles Jackson into `target/obsi.jar`, so `./run.sh` needs only Java 25.
 
 ## Layout
 
-- **`docs/obsi-methodology.md`:** the spec.
-- **`docs/take-home-assessment.pdf`:** the brief.
-- **`docs/decisions.md`:** every interpretation of the spec.
-- **`docs/reference/`:** CME CF background only.
+- **`docs/`:** the spec, the brief, `decisions.md`, and CME CF background in `reference/`.
 - **`data/`:** input files.
-- **`src/main/java/.../obsi`:** `Main`, plus the `input/`, `method/` and `output/` packages.
-- **`src/test/java`:** tests, mirroring the packages.
+- **`src/main/java/.../obsi`:** `Main` and the `input/`, `method/`, `output/` packages; tests mirror them.
 
 ## Still to do
 
